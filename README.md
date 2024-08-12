@@ -1,5 +1,9 @@
 # Standard-Unlocked
 
+This repository contains all of the basic configuration for end-to-end CICD for an unlocked package. 
+
+Usage guide is forthcoming.
+
 ## Development
 
 ### [Recommended] Contribute to this project in your browser. 
