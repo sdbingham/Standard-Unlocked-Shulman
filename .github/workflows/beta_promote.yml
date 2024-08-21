@@ -14,4 +14,3 @@ jobs:
       dev-hub-auth-url: ${{ secrets.DEV_HUB_AUTH_URL }}
     with:
       cumulusci-version: "3.78.0"
-      org-name: "prod"
