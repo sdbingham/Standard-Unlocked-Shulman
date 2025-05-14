@@ -1,23 +1,23 @@
-# NYS-Foundations
+# Standard-Unlocked
+
+This repository contains everything you need to realize enterprise-grade Salesforce CICD practices without making an enterprise-grade investment. 
+
+The included [Github Actions](.github/workflows) provide a standardized (and mostly automated!) framework for building, testing, and delivering solutions in a consistent and repeatable manner. 
+
+We strongly advocate adhering to a "Release Train" development methodology for Salesforce development. When applied with discipline, this approach consistently balances business demands, development rigor, and the unique constraints of working with Salesforce metadata significantly better than other popular methodologies (e.g. Scrum).
+
+## Salesforce Release Train Development Cadence
+
+![image](https://github.com/user-attachments/assets/6b7d1dc8-30cb-4740-964e-8cd55f54a847)
+[Image Credit: CumulusCI Documentation](https://cumulusci.readthedocs.io/en/stable/cumulusci-flow.html)
 
 ## Getting Started
 
-- [ ] Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Standard-Unlocked/blob/main/.github/workflows/README.md#initial-setup) to configure the bootstrapped CICD for this project.
+1. Fork this repository.
+2. Make a _new_ Repository in your organization and select your fork as the `Repository Template`
+4. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Standard-Unlocked/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
 
 ## Development
-
-### [Recommended] Contribute to this project in your browser. 
-
-1. [Navigate to the PROJECT_NAME project in nimba.dev](https://www.nimba.dev/projects/PROJECT_NAME)
-2. Create / Go To a Task record.
-3. In the `Developer` card, click `Assign` and select yourself.
-4. Click `Create Org` (NOT `Create Scratch Org`)
-5. Log into the org, build your solution, and periodically retrieve your changes.
-6. When you're ready, click `Submit Task for Testing`.
-7. Click `View Pull Request`.
-8. Monitor for Success/Failure
-
-### [Advanced] Contribute to this project on your device. 
 
 1. [Set up CumulusCI](https://cumulusci.readthedocs.io/en/latest/tutorial.html) in your preferred development environnment.
 2. Run `cci flow run dev_org --org dev` to deploy this project.
@@ -33,7 +33,10 @@
 
 ### [Recommended] Release this project using the Built-in CICD Actions
 
-Follow the provided [`Releases` instructions](https://github.com/Nimba-Solutions/Standard-Unlocked/blob/main/.github/workflows/README.md#releases).
+Follow the provided [`Release` instructions](https://github.com/Nimba-Solutions/Standard-Unlocked/blob/main/.github/workflows/README.md#releases).
+
+
+---
 
 ### [Advanced] Release this project using your CLI
 
