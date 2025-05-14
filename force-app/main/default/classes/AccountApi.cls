@@ -1,5 +1,5 @@
 @RestResource(urlMapping='/v1/accounts/*')
-global with sharing class AccountRouter {
+global with sharing class AccountApi {
     
     @HttpGet
     global static void doGet() {

@@ -1,5 +1,5 @@
 @IsTest
-private class AccountRouterTest {
+private class AccountApiTest {
     
     @IsTest
     static void testGetAccount() {
@@ -16,7 +16,7 @@ private class AccountRouterTest {
         
         // Call the method
         Test.startTest();
-        AccountRouter.doGet();
+        AccountApi.doGet();
         Test.stopTest();
         
         // Verify the response
@@ -39,7 +39,7 @@ private class AccountRouterTest {
         
         // Call the method
         Test.startTest();
-        AccountRouter.doGet();
+        AccountApi.doGet();
         Test.stopTest();
         
         // Verify the response
@@ -58,7 +58,7 @@ private class AccountRouterTest {
         
         // Call the method
         Test.startTest();
-        AccountRouter.doGet();
+        AccountApi.doGet();
         Test.stopTest();
         
         // Verify the response
@@ -78,7 +78,7 @@ private class AccountRouterTest {
         
         // Call the method
         Test.startTest();
-        AccountRouter.doPost();
+        AccountApi.doPost();
         Test.stopTest();
         
         // Verify the response
@@ -103,7 +103,7 @@ private class AccountRouterTest {
         
         // Call the method
         Test.startTest();
-        AccountRouter.doPost();
+        AccountApi.doPost();
         Test.stopTest();
         
         // Verify the response
@@ -123,7 +123,7 @@ private class AccountRouterTest {
         
         // Call the method
         Test.startTest();
-        AccountRouter.doPost();
+        AccountApi.doPost();
         Test.stopTest();
         
         // Verify the response
