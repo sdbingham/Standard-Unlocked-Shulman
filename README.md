@@ -19,7 +19,7 @@ We strongly advocate adhering to a "Release Train" development methodology for S
 4. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Standard-Unlocked/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
 
 > [!NOTE]
-> * As you explore this project, you may notice a large number of tokens. These are provided as a convenience and should be automatically replaced by the values specificied in Step 3 whenever you build scratch orgs or generate releases.
+> * As you explore this project, you may notice a large number of tokens such as     `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These are provided as a convenience and should be automatically replaced by the values specified in Step 3 whenever you build scratch orgs or generate releases.
 
 ## Development
 
