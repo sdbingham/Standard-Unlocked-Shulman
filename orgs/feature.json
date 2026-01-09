@@ -19,6 +19,15 @@
     },
     "languageSettings": {
       "enableTranslationWorkbench": true
+    },
+    "enhancedNotesSettings": {
+      "enableEnhancedNotes": true
+    },
+    "emailAdministrationSettings": {
+      "enableEnhancedEmailEnabled": true
+    },
+    "apexSettings": {
+      "enableCompileOnDeploy": true
     }
   }
 }
