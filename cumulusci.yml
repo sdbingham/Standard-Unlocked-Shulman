@@ -56,8 +56,7 @@ tasks:
     # └── 📁 tasks/
     #     ├── 📄 retrieve_changes.py
     #     ├── 📄 permsets.py
-    #     ├── 📄 deploy.py
-    #     └── 📄 create_package_version.py
+    #     └── 📄 deploy.py (provides filename-aware transforms for all tasks)
     retrieve_changes:
         class_path: tasks.retrieve_changes.RetrieveChanges
         options:
@@ -86,7 +85,6 @@ tasks:
                             replace: $project_config.project__package__name
 
     create_package_version:
-        class_path: tasks.create_package_version.CreatePackageVersion
         options:
             transforms:
                 - transform: find_replace
