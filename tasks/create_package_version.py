@@ -1,5 +1,5 @@
 from cumulusci.core.source_transforms.transforms import FindReplaceTransform
-from cumulusci.tasks.package import CreatePackageVersion as BaseCreatePackageVersion
+from cumulusci.tasks.salesforce.package import CreatePackageVersion as BaseCreatePackageVersion
 from tasks.deploy import FindReplaceWithFilename
 
 
