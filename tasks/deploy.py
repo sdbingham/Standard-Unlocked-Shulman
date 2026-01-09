@@ -36,22 +36,28 @@ class FindReplaceWithFilename(FindReplaceTransform):
 def _patch_transform_loading():
     """Patch transform instantiation to use filename-aware transforms for find_replace."""
     try:
-        from cumulusci.core.source_transforms.transforms import TransformRegistry
+        # Patch BaseTask to replace find_replace transforms with filename-aware version
+        from cumulusci.core.tasks import BaseTask
         
-        # Get the original transform factory
-        original_factory = None
-        if hasattr(TransformRegistry, 'get_transform'):
-            original_get_transform = TransformRegistry.get_transform
-            
-            def patched_get_transform(transform_name, options):
-                """Patched version that uses filename-aware transform for find_replace."""
-                transform = original_get_transform(transform_name, options)
-                # If it's a find_replace transform, replace with filename-aware version
-                if transform_name == 'find_replace' and isinstance(transform, FindReplaceTransform):
-                    return FindReplaceWithFilename(options)
-                return transform
-            
-            TransformRegistry.get_transform = patched_get_transform
+        # Store original _init_options
+        original_init_options = BaseTask._init_options
+        
+        def patched_init_options(self, kwargs):
+            """Patched _init_options that replaces find_replace transforms."""
+            # Call original first
+            original_init_options(self, kwargs)
+            # After transforms are loaded, replace find_replace with filename-aware version
+            if hasattr(self, 'transforms') and self.transforms:
+                for i, transform in enumerate(self.transforms):
+                    if isinstance(transform, FindReplaceTransform):
+                        # Replace with filename-aware version, preserving options
+                        self.transforms[i] = FindReplaceWithFilename(transform.options)
+        
+        # Only patch if not already patched (avoid double-patching)
+        if not hasattr(BaseTask._init_options, '_patched'):
+            BaseTask._init_options = patched_init_options
+            BaseTask._init_options._patched = True
+        
     except Exception:
         # If patching fails, the Deploy class will still work
         pass
