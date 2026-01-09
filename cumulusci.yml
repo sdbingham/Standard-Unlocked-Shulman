@@ -1,9 +1,9 @@
 minimum_cumulusci_version: "3.78.0"
 project:
-    name: Standard Unlocked
+    name: Standard Unlocked Shulman
     package:
-        name: StandardUnlocked
-        name_managed: Standard Unlocked
+        name: StandardUnlockedShulman
+        name_managed: Standard Unlocked Shulman
         api_version: "61.0"
     # dependencies:
     #     - version_id: 04t8b000001ZxNVAA0 # FlowActionsBasePack Version: 3.18
