@@ -39,8 +39,11 @@ def _patch_transform_loading():
         # Patch BaseTask to replace find_replace transforms with filename-aware version
         from cumulusci.core.tasks import BaseTask
         
-        # Store original _init_options
-        original_init_options = BaseTask._init_options
+        # Store original _init_options if not already stored
+        if not hasattr(BaseTask, '_original_init_options_patched'):
+            BaseTask._original_init_options_patched = BaseTask._init_options
+        
+        original_init_options = BaseTask._original_init_options_patched
         
         def patched_init_options(self, kwargs):
             """Patched _init_options that replaces find_replace transforms."""
@@ -52,17 +55,35 @@ def _patch_transform_loading():
                     if isinstance(transform, FindReplaceTransform):
                         # Replace with filename-aware version, preserving options
                         self.transforms[i] = FindReplaceWithFilename(transform.options)
+                        # Log for debugging (will show in GitHub Actions logs)
+                        if hasattr(self, 'logger'):
+                            self.logger.info(f"Replaced find_replace transform with filename-aware version in {self.__class__.__name__}")
         
-        # Only patch if not already patched (avoid double-patching)
-        if not hasattr(BaseTask._init_options, '_patched'):
-            BaseTask._init_options = patched_init_options
-            BaseTask._init_options._patched = True
+        # Patch BaseTask._init_options
+        BaseTask._init_options = patched_init_options
         
-    except Exception:
+        # Also try patching the transform registry directly
+        try:
+            from cumulusci.core.source_transforms.transforms import TransformRegistry
+            # Patch the registry's transform creation method
+            if hasattr(TransformRegistry, 'get_transform'):
+                original_get_transform = TransformRegistry.get_transform
+                def patched_get_transform(self, transform_name, options):
+                    transform = original_get_transform(self, transform_name, options)
+                    if transform_name == 'find_replace' and isinstance(transform, FindReplaceTransform):
+                        return FindReplaceWithFilename(options)
+                    return transform
+                TransformRegistry.get_transform = patched_get_transform
+        except Exception:
+            pass
+        
+    except Exception as e:
         # If patching fails, the Deploy class will still work
+        # Silently fail - we'll rely on the Deploy class override instead
         pass
 
 # Patch on module import - this ensures all tasks get filename-aware transforms
+# This must run before any tasks are instantiated
 _patch_transform_loading()
 
 
