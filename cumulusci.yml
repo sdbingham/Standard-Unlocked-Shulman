@@ -68,8 +68,6 @@ tasks:
         options:
             api_names: StandardUnlockedShulmanAdmin
 
-    create_package_version:
-        options: {}
 
 flows:
     config_dev:
