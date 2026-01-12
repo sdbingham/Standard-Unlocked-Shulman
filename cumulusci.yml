@@ -50,50 +50,26 @@ tasks:
         options:
             required_org_code_coverage_percent: 75
 
-    # CumulusCI ships with both `retrieve_changes`, `permsets`, `deploy`, and `create_package_version` tasks out of the box,
-    # but they don't provide sufficient find/replace functionality so this project
-    # ships with custom wrapper tasks:
+    # CumulusCI ships with both `retrieve_changes`, `permsets`, `deploy`, and `create_package_version` tasks out of the box.
+    # This project ships with custom wrapper tasks:
     # └── 📁 tasks/
     #     ├── 📄 retrieve_changes.py
     #     ├── 📄 permsets.py
-    #     └── 📄 deploy.py (provides filename-aware transforms for all tasks)
+    #     └── 📄 deploy.py
     retrieve_changes:
         class_path: tasks.retrieve_changes.RetrieveChanges
         options:
-            preserve_tokens: "__PROJECT_NAME__,__PROJECT_LABEL__"
+            preserve_tokens: ""
     deploy:
         class_path: tasks.deploy.Deploy
-        options:
-            transforms:
-                - transform: find_replace
-                  options:
-                      patterns:
-                          - find: "__PROJECT_NAME__"
-                            replace: $project_config.project__package__name
-                          - find: "__PROJECT_LABEL__"
-                            replace: $project_config.project__package__name_managed
 
     assign_permission_set_groups:
         class_path: tasks.permsets.AssignPermissionSetsWithFindReplace
         options:
-            api_names: __PROJECT_NAME__Admin
-            transforms:
-                - transform: find_replace
-                  options:
-                      patterns:
-                          - find: "__PROJECT_NAME__"
-                            replace: $project_config.project__package__name
+            api_names: StandardUnlockedShulmanAdmin
 
     create_package_version:
-        options:
-            transforms:
-                - transform: find_replace
-                  options:
-                      patterns:
-                          - find: "__PROJECT_NAME__"
-                            replace: $project_config.project__package__name
-                          - find: "__PROJECT_LABEL__"
-                            replace: $project_config.project__package__name_managed
+        options: {}
 
 flows:
     config_dev:
