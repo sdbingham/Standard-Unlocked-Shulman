@@ -39,7 +39,11 @@ def update_cumulusci_yml(project_name: str, project_label: str):
         print(f"Error: {file_path} not found!")
         return False
     
-    content = file_path.read_text()
+    try:
+        content = file_path.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        # Fallback to latin-1 if UTF-8 fails
+        content = file_path.read_text(encoding='latin-1')
     
     # Convert label to API name (remove spaces, keep capitalization)
     api_name = project_label.replace(" ", "")
@@ -69,7 +73,7 @@ def update_cumulusci_yml(project_name: str, project_label: str):
             lines[i] = re.sub(r'name_managed:\s*"[^"]*"', f'name_managed: "{project_label}"', line)
     
     content = '\n'.join(lines)
-    file_path.write_text(content)
+    file_path.write_text(content, encoding='utf-8')
     print(f"[OK] Updated {file_path}")
     return True
 
@@ -84,7 +88,10 @@ def update_org_json_files(project_label: str):
     
     updated_files = []
     for json_file in orgs_dir.glob("*.json"):
-        content = json_file.read_text()
+        try:
+            content = json_file.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            content = json_file.read_text(encoding='latin-1')
         
         # Update orgName field
         # Pattern: "orgName": "Standard-Unlocked-Shulman - X Org"
@@ -93,7 +100,7 @@ def update_org_json_files(project_label: str):
         new_content = re.sub(pattern, replacement, content)
         
         if new_content != content:
-            json_file.write_text(new_content)
+            json_file.write_text(new_content, encoding='utf-8')
             updated_files.append(json_file.name)
             print(f"[OK] Updated {json_file}")
     
@@ -107,7 +114,10 @@ def update_permission_set_references(api_name: str):
     if not file_path.exists():
         return False
     
-    content = file_path.read_text()
+    try:
+        content = file_path.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        content = file_path.read_text(encoding='latin-1')
     
     # Update assign_permission_set_groups api_names
     pattern = r'api_names:\s*\w+'
@@ -115,7 +125,7 @@ def update_permission_set_references(api_name: str):
     new_content = re.sub(pattern, replacement, content)
     
     if new_content != content:
-        file_path.write_text(new_content)
+        file_path.write_text(new_content, encoding='utf-8')
         print(f"[OK] Updated permission set group references in {file_path}")
         return True
     
