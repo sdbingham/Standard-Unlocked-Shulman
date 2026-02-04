@@ -31,8 +31,8 @@ except ImportError:
     sys.exit(1)
 
 
-def update_cumulusci_yml(project_name: str, project_label: str):
-    """Update cumulusci.yml with new project name and label."""
+def update_cumulusci_yml(project_name: str):
+    """Update cumulusci.yml with new project name and derived values."""
     file_path = Path("cumulusci.yml")
     
     if not file_path.exists():
@@ -45,8 +45,11 @@ def update_cumulusci_yml(project_name: str, project_label: str):
         # Fallback to latin-1 if UTF-8 fails
         content = file_path.read_text(encoding='latin-1')
     
-    # Convert label to API name (remove spaces, keep capitalization)
-    api_name = project_label.replace(" ", "")
+    # Derive package name (remove spaces, keep capitalization)
+    package_name = project_name.replace(" ", "")
+    
+    # Derive name_managed (replace spaces with hyphens)
+    name_managed = project_name.replace(" ", "-")
     
     # Update project name (first "name:" under "project:")
     # Match: project: ... name: "..." (with any indentation)
@@ -63,14 +66,14 @@ def update_cumulusci_yml(project_name: str, project_label: str):
             in_package_section = True
         elif in_project_section and not in_package_section and stripped.startswith('name:'):
             # This is the project name
-            lines[i] = re.sub(r'name:\s*"[^"]*"', f'name: "{project_label}"', line)
+            lines[i] = re.sub(r'name:\s*"[^"]*"', f'name: "{project_name}"', line)
             in_project_section = False  # Only update first occurrence
         elif in_package_section and stripped.startswith('name:'):
-            # This is the package name
-            lines[i] = re.sub(r'name:\s*\w+', f'name: {api_name}', line)
+            # This is the package name (remove spaces)
+            lines[i] = re.sub(r'name:\s*\w+', f'name: {package_name}', line)
         elif in_package_section and stripped.startswith('name_managed:'):
-            # This is name_managed
-            lines[i] = re.sub(r'name_managed:\s*"[^"]*"', f'name_managed: "{project_label}"', line)
+            # This is name_managed (replace spaces with hyphens)
+            lines[i] = re.sub(r'name_managed:\s*"[^"]*"', f'name_managed: "{name_managed}"', line)
     
     content = '\n'.join(lines)
     file_path.write_text(content, encoding='utf-8')
@@ -78,7 +81,7 @@ def update_cumulusci_yml(project_name: str, project_label: str):
     return True
 
 
-def update_org_json_files(project_label: str):
+def update_org_json_files(project_name: str):
     """Update org names in all orgs/*.json files."""
     orgs_dir = Path("orgs")
     
@@ -94,9 +97,9 @@ def update_org_json_files(project_label: str):
             content = json_file.read_text(encoding='latin-1')
         
         # Update orgName field
-        # Pattern: "orgName": "Standard-Unlocked-Shulman - X Org"
+        # Pattern: "orgName": "Project Name - X Org"
         pattern = r'"orgName":\s*"[^"]*"'
-        replacement = f'"orgName": "{project_label} - {json_file.stem.capitalize()} Org"'
+        replacement = f'"orgName": "{project_name} - {json_file.stem.capitalize()} Org"'
         new_content = re.sub(pattern, replacement, content)
         
         if new_content != content:
@@ -107,7 +110,7 @@ def update_org_json_files(project_label: str):
     return len(updated_files) > 0
 
 
-def update_permission_set_references(api_name: str):
+def update_permission_set_references(package_name: str):
     """Update permission set group references in cumulusci.yml."""
     file_path = Path("cumulusci.yml")
     
@@ -121,7 +124,7 @@ def update_permission_set_references(api_name: str):
     
     # Update assign_permission_set_groups api_names
     pattern = r'api_names:\s*\w+'
-    replacement = f'api_names: {api_name}Admin'
+    replacement = f'api_names: {package_name}Admin'
     new_content = re.sub(pattern, replacement, content)
     
     if new_content != content:
@@ -198,6 +201,22 @@ def verify_token_permissions(github_token: str):
         return False, f"Error verifying token: {str(e)}"
 
 
+def check_repo_exists(github_token: str, owner: str, repo_name: str):
+    """Check if a repository already exists."""
+    api_base = "https://api.github.com"
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    check_url = f"{api_base}/repos/{owner}/{repo_name}"
+    try:
+        response = requests.get(check_url, headers=headers, timeout=10)
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
 def fork_repository(github_token: str, source_owner: str, source_repo: str, new_repo_name: str):
     """Fork a repository using GitHub API."""
     api_base = "https://api.github.com"
@@ -205,6 +224,20 @@ def fork_repository(github_token: str, source_owner: str, source_repo: str, new_
         "Authorization": f"token {github_token}",
         "Accept": "application/vnd.github.v3+json"
     }
+    
+    # Check if repository with new name already exists
+    user_response = requests.get(f"{api_base}/user", headers=headers, timeout=10)
+    if user_response.status_code == 200:
+        fork_owner = user_response.json().get("login")
+        if check_repo_exists(github_token, fork_owner, new_repo_name):
+            print(f"[WARNING] Repository '{fork_owner}/{new_repo_name}' already exists!")
+            return {
+                "success": True,
+                "owner": fork_owner,
+                "repo": new_repo_name,
+                "url": f"https://github.com/{fork_owner}/{new_repo_name}",
+                "already_exists": True
+            }
     
     # Step 1: Fork the repository
     fork_url = f"{api_base}/repos/{source_owner}/{source_repo}/forks"
@@ -300,6 +333,24 @@ def fork_repository(github_token: str, source_owner: str, source_repo: str, new_
         elif response.status_code == 403:
             error_data = response.json() if response.content else {}
             error_msg = error_data.get("message", "Forbidden - insufficient permissions")
+            
+            # Provide specific guidance for permission errors
+            print()
+            print("[WARNING] Fork Permission Error:")
+            print("   Your token doesn't have permission to fork this repository.")
+            print()
+            print("   Possible reasons:")
+            print("   1. Token doesn't have 'repo' scope (Classic PAT) or 'Contents' permission (Fine-Grained PAT)")
+            print("   2. Repository is private and token doesn't have access")
+            print("   3. Organization settings prevent forking")
+            print()
+            print("   Solutions:")
+            print("   - For Classic PAT: Ensure 'repo' scope is selected")
+            print("   - For Fine-Grained PAT: Ensure 'Contents: Read and write' permission is granted")
+            print("   - Verify the token has access to the source repository")
+            print("   - Check organization fork policies")
+            print()
+            
             return {
                 "success": False,
                 "error": f"Permission denied: {error_msg}"
@@ -390,6 +441,76 @@ def fork_repository(github_token: str, source_owner: str, source_repo: str, new_
         }
 
 
+def clone_repository(repo_url: str, target_dir: str):
+    """Clone a repository to a target directory."""
+    try:
+        print(f"Cloning repository to {target_dir}...")
+        result = subprocess.run(
+            ["git", "clone", repo_url, target_dir],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        print(f"[OK] Repository cloned successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] Failed to clone repository: {e.stderr}")
+        return False
+    except Exception as e:
+        print(f"[ERROR] Unexpected error cloning repository: {str(e)}")
+        return False
+
+
+def replace_tokens_in_files(package_name: str, name_managed: str):
+    """Replace __PROJECT_NAME__ and __PROJECT_LABEL__ tokens in filenames and file contents."""
+    renamed_count = 0
+    updated_count = 0
+    
+    # Search in common directories
+    search_dirs = ["force-app", "datasets", "robot"]
+    
+    for search_dir in search_dirs:
+        dir_path = Path(search_dir)
+        if not dir_path.exists():
+            continue
+        
+        # First pass: rename files
+        files_to_rename = []
+        for file_path in dir_path.rglob("*"):
+            if file_path.is_file() and '__PROJECT_NAME__' in file_path.name:
+                files_to_rename.append(file_path)
+        
+        for file_path in files_to_rename:
+            try:
+                new_name = file_path.name.replace('__PROJECT_NAME__', package_name)
+                new_path = file_path.parent / new_name
+                file_path.rename(new_path)
+                print(f"[OK] Renamed {file_path.name} -> {new_name}")
+                renamed_count += 1
+            except Exception as e:
+                print(f"[WARNING] Could not rename {file_path}: {e}")
+        
+        # Second pass: update file contents
+        for file_path in dir_path.rglob("*"):
+            if file_path.is_file():
+                try:
+                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    original_content = content
+                    
+                    # Replace tokens in content
+                    content = content.replace('__PROJECT_NAME__', package_name)
+                    content = content.replace('__PROJECT_LABEL__', name_managed)
+                    
+                    if content != original_content:
+                        file_path.write_text(content, encoding='utf-8')
+                        updated_count += 1
+                except Exception:
+                    # Skip binary files or files that can't be read
+                    pass
+    
+    return renamed_count, updated_count
+
+
 def check_for_tokens():
     """Check for any remaining __PROJECT_NAME__ or __PROJECT_LABEL__ tokens."""
     tokens_found = []
@@ -405,6 +526,11 @@ def check_for_tokens():
         for file_path in dir_path.rglob("*"):
             if file_path.is_file():
                 try:
+                    # Check filename
+                    if '__PROJECT_NAME__' in file_path.name or '__PROJECT_LABEL__' in file_path.name:
+                        tokens_found.append((file_path, 'filename'))
+                    
+                    # Check content
                     content = file_path.read_text(encoding='utf-8', errors='ignore')
                     if '__PROJECT_NAME__' in content:
                         tokens_found.append((file_path, '__PROJECT_NAME__'))
@@ -485,43 +611,41 @@ def main():
         sys.exit(1)
     print("[OK] Token verified")
     
-    # Get new repository name
+    # Get project name - everything else is derived from this
     print()
-    new_repo_name = input("New repository name (e.g., 'my-new-project'): ").strip()
+    project_name = input("Project Name (e.g., 'Shulman Intake Platform'): ").strip()
     
-    if not new_repo_name:
-        print("Error: Repository name is required!")
+    if not project_name:
+        print("Error: Project name is required!")
         sys.exit(1)
     
-    # Validate repository name (GitHub rules: alphanumeric, hyphens, underscores)
-    if not re.match(r'^[a-zA-Z0-9._-]+$', new_repo_name):
-        print("Error: Invalid repository name. Use only letters, numbers, hyphens, underscores, and dots.")
-        sys.exit(1)
+    # Derive all values from project name
+    # Repository name: replace spaces with hyphens, lowercase
+    new_repo_name = project_name.replace(" ", "-").lower()
     
-    # Get project information
-    print()
-    print("Enter your project details:")
-    project_label = input("Project Label (e.g., 'Standard Unlocked Shulman'): ").strip()
+    # Package name: remove spaces, keep capitalization
+    package_name = project_name.replace(" ", "")
     
-    if not project_label:
-        print("Error: Project label is required!")
-        sys.exit(1)
-    
-    # Convert label to API name (remove spaces, keep capitalization)
-    api_name = project_label.replace(" ", "")
+    # Name managed: replace spaces with hyphens, keep capitalization
+    name_managed = project_name.replace(" ", "-")
     
     print()
-    print("Summary:")
+    print("Summary (all derived from Project Name):")
     print(f"  Source Repository: {remote_info['full_name']}")
-    print(f"  New Repository Name: {new_repo_name}")
-    print(f"  Project Label: {project_label}")
-    print(f"  API Name: {api_name}")
+    print(f"  Project Name: {project_name}")
+    print(f"  New Repository Name: {new_repo_name} (spaces -> hyphens, lowercase)")
+    print(f"  Package Name: {package_name} (spaces removed)")
+    print(f"  Name Managed: {name_managed} (spaces -> hyphens)")
     print()
     
     confirm = input("Continue with these values? (y/n): ").strip().lower()
     if confirm != 'y':
         print("Setup cancelled.")
         sys.exit(0)
+    
+    # Store original working directory
+    original_cwd = os.getcwd()
+    clone_dir = None
     
     # Fork and rename repository
     print()
@@ -538,47 +662,99 @@ def main():
     if not fork_result['success']:
         print(f"[ERROR] Failed to fork repository: {fork_result.get('error', 'Unknown error')}")
         print()
-        print("You can manually fork the repository and continue with file updates.")
-        manual_continue = input("Continue with file updates only? (y/n): ").strip().lower()
+        print("Options:")
+        print("  1. Fix token permissions and run the script again")
+        print("  2. Manually fork the repository on GitHub, then continue with file updates")
+        print()
+        manual_continue = input("Continue with file updates only (skip fork)? (y/n): ").strip().lower()
         if manual_continue != 'y':
+            print()
+            print("Setup cancelled. Please fix token permissions or fork manually, then run the script again.")
             sys.exit(1)
+        # If continuing without fork, work in current directory
+        clone_dir = None
     else:
         print()
         print(f"[OK] Repository forked and renamed successfully!")
         print(f"  URL: {fork_result['url']}")
         print()
         
-        # Update git remote to point to the new fork
-        update_remote = input("Update git remote to point to the new fork? (y/n): ").strip().lower()
-        if update_remote == 'y':
-            try:
-                new_remote_url = f"https://github.com/{fork_result['owner']}/{fork_result['repo']}.git"
-                subprocess.run(
-                    ["git", "remote", "set-url", "origin", new_remote_url],
-                    check=True,
-                    capture_output=True
-                )
-                print(f"[OK] Git remote updated to: {new_remote_url}")
-            except subprocess.CalledProcessError as e:
-                print(f"[WARNING] Warning: Could not update git remote: {e}")
-            except Exception as e:
-                print(f"[WARNING] Warning: Could not update git remote: {e}")
+        # Clone the forked repository
+        print("=" * 60)
+        print("Cloning Forked Repository")
+        print("=" * 60)
         
+        repo_url = f"https://github.com/{fork_result['owner']}/{fork_result['repo']}.git"
+        clone_dir = new_repo_name
+        clone_dir_abs = os.path.abspath(clone_dir)
+        
+        # Check if directory already exists
+        if Path(clone_dir).exists():
+            print(f"[WARNING] Directory '{clone_dir}' already exists.")
+            if fork_result.get('already_exists'):
+                print("Repository already exists on GitHub. Using existing local directory.")
+                # Verify it's a git repo and has the right remote
+                try:
+                    result = subprocess.run(
+                        ["git", "remote", "get-url", "origin"],
+                        cwd=clone_dir_abs,
+                        capture_output=True,
+                        text=True
+                    )
+                    if result.returncode == 0 and fork_result['repo'] in result.stdout:
+                        print(f"[OK] Existing directory matches repository: {fork_result['repo']}")
+                    else:
+                        print(f"[WARNING] Existing directory may not match repository. Please verify.")
+                except Exception:
+                    pass
+            else:
+                overwrite = input(f"Remove existing directory and clone fresh? (y/n): ").strip().lower()
+                if overwrite == 'y':
+                    import shutil
+                    shutil.rmtree(clone_dir_abs)
+                    if not clone_repository(repo_url, clone_dir):
+                        print("[ERROR] Failed to clone repository. Cannot continue.")
+                        sys.exit(1)
+                    clone_dir_abs = os.path.abspath(clone_dir)
+                else:
+                    print("Using existing directory. Make sure it's the correct repository.")
+        else:
+            if not clone_repository(repo_url, clone_dir):
+                print("[ERROR] Failed to clone repository. Cannot continue.")
+                sys.exit(1)
+            clone_dir_abs = os.path.abspath(clone_dir)
+        
+        # Change to the cloned repository directory
+        os.chdir(clone_dir_abs)
+        print(f"[OK] Switched to workspace: {os.getcwd()}")
         print()
     
     print()
     print("=" * 60)
     print("Updating Files")
     print("=" * 60)
+    print(f"Working directory: {os.getcwd()}")
+    print()
     
-    # Update files
+    # Update configuration files
     success = True
-    success &= update_cumulusci_yml(api_name, project_label)
-    success &= update_org_json_files(project_label)
-    success &= update_permission_set_references(api_name)
+    success &= update_cumulusci_yml(project_name)
+    success &= update_org_json_files(project_name)
+    success &= update_permission_set_references(package_name)
     
     if not success:
         print("Warning: Some files may not have been updated. Please review manually.")
+    
+    # Replace tokens in filenames and file contents
+    print()
+    print("Replacing tokens in filenames and file contents...")
+    print("-" * 60)
+    renamed_count, updated_count = replace_tokens_in_files(package_name, name_managed)
+    
+    if renamed_count > 0 or updated_count > 0:
+        print(f"[OK] Renamed {renamed_count} file(s) and updated {updated_count} file(s)")
+    else:
+        print("[OK] No files needed token replacement")
     
     # Check for remaining tokens
     print()
@@ -594,6 +770,17 @@ def main():
         print("These files need manual token replacement.")
     else:
         print("[OK] No remaining tokens found in metadata files.")
+    
+    # Restore original directory if we cloned
+    if clone_dir:
+        final_path = os.path.abspath(clone_dir) if not os.path.isabs(clone_dir) else clone_dir
+        os.chdir(original_cwd)
+        print()
+        print(f"[OK] Setup complete! New project is in: {final_path}")
+        print(f"     To continue working, run: cd {final_path}")
+    else:
+        print()
+        print("[OK] Setup complete! Files updated in current directory.")
     
     print()
     print("=" * 60)
@@ -611,8 +798,8 @@ def main():
     
     if tokens_found:
         print("3. [WARNING] IMPORTANT: Manually replace tokens in the files listed above")
-        print("   Replace '__PROJECT_NAME__' with:", api_name)
-        print("   Replace '__PROJECT_LABEL__' with:", project_label)
+        print("   Replace '__PROJECT_NAME__' with:", package_name)
+        print("   Replace '__PROJECT_LABEL__' with:", name_managed)
     else:
         print("3. [OK] No token replacement needed in metadata files")
     
