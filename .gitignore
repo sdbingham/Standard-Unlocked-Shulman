@@ -8,7 +8,7 @@
 __pycache__
 
 # Robot Framework results
-robot/Standard-Unlocked/results/
+robot/Standard-Unlocked-Shulman/results/
 
 # Salesforce cache
 .sf/

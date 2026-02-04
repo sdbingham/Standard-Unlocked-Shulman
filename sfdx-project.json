@@ -3,10 +3,10 @@
         {
             "path": "force-app",
             "default": true,
-            "package": "Standard-Unlocked",
+            "package": "Standard-Unlocked-Shulman",
             "versionName": "ver 1.0",
             "versionNumber": "1.0.0.NEXT",
-            "versionDescription": "Initial version of the Standard-Unlocked Package"
+            "versionDescription": "Initial version of the Standard-Unlocked-Shulman Package"
         },
         {
             "path": "unpackaged"

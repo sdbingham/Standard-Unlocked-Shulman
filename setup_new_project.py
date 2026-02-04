@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Setup script for creating a new project from the Standard-Unlocked template.
+Setup script for creating a new project from the Standard-Unlocked-Shulman template.
 
 This script automates the initial setup steps:
 1. Forks the repository to a new name
@@ -87,7 +87,7 @@ def update_org_json_files(project_label: str):
         content = json_file.read_text()
         
         # Update orgName field
-        # Pattern: "orgName": "Standard-Unlocked - X Org"
+        # Pattern: "orgName": "Standard-Unlocked-Shulman - X Org"
         pattern = r'"orgName":\s*"[^"]*"'
         replacement = f'"orgName": "{project_label} - {json_file.stem.capitalize()} Org"'
         new_content = re.sub(pattern, replacement, content)
@@ -410,7 +410,7 @@ def check_for_tokens():
 def main():
     """Main setup function."""
     print("=" * 60)
-    print("Standard-Unlocked Project Setup Script")
+    print("Standard-Unlocked-Shulman Project Setup Script")
     print("=" * 60)
     print()
     
