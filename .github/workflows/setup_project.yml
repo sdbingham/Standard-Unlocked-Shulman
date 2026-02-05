@@ -1,16 +1,11 @@
-# This workflow automatically runs setup_new_project.py when the repository is first set up.
+# This workflow runs setup_new_project.py when the repository is first set up.
 # It extracts the repository name and replaces all __PROJECT_NAME__ and __PROJECT_LABEL__ tokens.
-# It runs automatically on push to main branch (happens automatically when repository is created from template).
-# Manual trigger via workflow_dispatch is available as a fallback.
+# Run this workflow manually after creating a repository from the template.
 
 name: Setup Project
 
 on:
-  # Trigger on push, but will exit immediately if not "Initial commit"
-  # We use a marker file approach to prevent repeated runs
-  push:
-    branches:
-      - main
+  # Manual trigger only - run this workflow manually after creating repository from template
   workflow_dispatch:
     inputs:
       repo_name:
@@ -31,27 +26,13 @@ jobs:
       github.repository != 'sdbingham/Standard-Unlocked-Shulman' &&
       github.repository != 'sdbingham/standard-unlocked-shulman' &&
       github.repository != 'sdbingham/StandardUnlockedShulman' &&
-      github.repository != 'sdbingham/STANDARD-UNLOCKED-SHULMAN' &&
-      (github.event_name == 'workflow_dispatch' || 
-       (github.event_name == 'push' && github.event.head_commit.message == 'Initial commit'))
+      github.repository != 'sdbingham/STANDARD-UNLOCKED-SHULMAN'
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Exit if not Initial commit
-        if: github.event_name == 'push'
-        run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          if [ "$COMMIT_MSG" != "Initial commit" ]; then
-            echo "⏭️ Skipping - commit message is not 'Initial commit'"
-            echo "This workflow only runs on 'Initial commit' commits"
-            # Exit with success code to prevent showing as failed
-            exit 0
-          fi
-          echo "✅ Commit message is 'Initial commit' - proceeding"
 
       - name: Check if setup already completed
         id: check_setup
