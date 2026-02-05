@@ -245,11 +245,35 @@ class CreatePackageVersion(BaseCreatePackageVersion):
         from cumulusci.core.source_transforms.transforms import FindReplaceTransformOptions, FindReplaceSpec
         
         # Create FindReplaceSpec objects from patterns
+        # Resolve $project_config patterns before creating FindReplaceSpec
         patterns = []
         for pattern in options.get('patterns', []):
+            find = pattern.get('find')
+            replace = pattern.get('replace')
+            
+            # Resolve $project_config patterns manually
+            if isinstance(replace, str) and replace.startswith('$project_config.'):
+                attr = replace.replace('$project_config.', '')
+                parts = attr.split('__')
+                value = self.project_config
+                for part in parts:
+                    if hasattr(value, part):
+                        value = getattr(value, part)
+                    elif isinstance(value, dict) and part in value:
+                        value = value[part]
+                    else:
+                        value = None
+                        break
+                if value:
+                    resolved_value = str(value)
+                    self.logger.debug(f"[TRANSFORM] Resolved {replace} -> {resolved_value}")
+                    replace = resolved_value
+                else:
+                    self.logger.warning(f"[TRANSFORM] Could not resolve {replace}, using as-is")
+            
             patterns.append(FindReplaceSpec(
-                find=pattern.get('find'),
-                replace=pattern.get('replace')
+                find=find,
+                replace=replace
             ))
         
         # Create options with patterns
