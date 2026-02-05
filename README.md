@@ -47,6 +47,9 @@ We strongly advocate adhering to a "Release Train" development methodology for S
    ```
 5. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
 
+> [!IMPORTANT]
+> **Template Protection**: This repository is protected by multiple safeguards to ensure it is NEVER modified when used as a template. See [TEMPLATE_PROTECTION.md](TEMPLATE_PROTECTION.md) for details.
+
 > [!NOTE]
 > 1. As you explore this project, you may notice a large number of tokens such as `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml). **Run `setup_new_project.py` once at project initialization** to permanently replace these tokens. After that, all files will use your actual project name.
 

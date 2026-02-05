@@ -26,9 +26,12 @@ jobs:
     # github.repository format: owner/repo-name
     # This check MUST be first to prevent any execution in the template
     # Using explicit repository path check - if this is the template, skip ALL steps
+    # Check multiple case variations to ensure we catch all possibilities
     if: |
       github.repository != 'sdbingham/Standard-Unlocked-Shulman' &&
       github.repository != 'sdbingham/standard-unlocked-shulman' &&
+      github.repository != 'sdbingham/StandardUnlockedShulman' &&
+      github.repository != 'sdbingham/STANDARD-UNLOCKED-SHULMAN' &&
       (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == '' || !contains(github.event.head_commit.message, '[skip setup]'))
     
     steps:
@@ -78,6 +81,7 @@ jobs:
         timeout-minutes: 10
         env:
           GITHUB_REPOSITORY_NAME: ${{ steps.repo_name.outputs.name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           CI: 'true'
         run: |
           echo "=========================================="
@@ -110,18 +114,25 @@ jobs:
         timeout-minutes: 5
         run: |
           # CRITICAL SAFETY CHECK: Never commit to template repository
+          # This is a redundant check (job-level if already prevents execution)
+          # but provides additional defense-in-depth protection
           CURRENT_REPO="${{ github.repository }}"
-          TEMPLATE_REPO="sdbingham/Standard-Unlocked-Shulman"
+          CURRENT_REPO_LOWER=$(echo "$CURRENT_REPO" | tr '[:upper:]' '[:lower:]')
+          TEMPLATE_REPOS="sdbingham/standard-unlocked-shulman sdbingham/standardunlockedshulman"
           
           echo "Current repository: $CURRENT_REPO"
-          echo "Template repository: $TEMPLATE_REPO"
+          echo "Current repository (lowercase): $CURRENT_REPO_LOWER"
+          echo "Template repositories: $TEMPLATE_REPOS"
           
-          if [ "$CURRENT_REPO" = "$TEMPLATE_REPO" ]; then
-            echo "❌ ERROR: This is the template repository!"
-            echo "❌ This workflow should NEVER run in the template repository."
-            echo "❌ Aborting to prevent modifying the template."
-            exit 1
-          fi
+          # Case-insensitive check
+          for TEMPLATE_REPO in $TEMPLATE_REPOS; do
+            if [ "$CURRENT_REPO_LOWER" = "$TEMPLATE_REPO" ]; then
+              echo "❌ ERROR: This is the template repository!"
+              echo "❌ This workflow should NEVER run in the template repository."
+              echo "❌ Aborting to prevent modifying the template."
+              exit 1
+            fi
+          done
           
           echo "✅ Safety check passed - this is NOT the template repository"
           echo "This workflow only commits to THIS repository, never to the template."

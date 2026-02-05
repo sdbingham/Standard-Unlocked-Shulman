@@ -137,7 +137,8 @@ def replace_tokens_in_files(package_name: str, name_managed: str, project_name: 
             print(f"[WARNING] Could not update cumulusci.yml: {e}")
     
     # Search in common directories
-    search_dirs = ["force-app", "datasets", "robot", "category"]
+    # Note: .cci directory is included but may not always exist
+    search_dirs = ["force-app", "datasets", "robot", "category", ".cci"]
     
     # First pass: rename directories and files with tokens
     for search_dir in search_dirs:
@@ -206,6 +207,14 @@ def replace_tokens_in_files(package_name: str, name_managed: str, project_name: 
     if orgs_dir.exists():
         all_files.extend(orgs_dir.glob("*.json"))
     
+    # Include .cci directory files (if present)
+    cci_dir = Path(".cci")
+    if cci_dir.exists():
+        # Include .cci/snapshot/*.json files
+        cci_snapshot_dir = cci_dir / "snapshot"
+        if cci_snapshot_dir.exists():
+            all_files.extend(cci_snapshot_dir.glob("*.json"))
+    
     for file_path in all_files:
         if not file_path.is_file():
             continue
@@ -248,20 +257,11 @@ def replace_tokens_in_files(package_name: str, name_managed: str, project_name: 
                 rel_path = file_path.relative_to(Path.cwd())
                 print(f"[OK] Updated {rel_path}")
                 updated_count += 1
-            elif file_path.name == '.gitignore':
-                # Debug: Check if .gitignore has tokens but wasn't updated
-                if '__PROJECT_NAME__' in original_content or '__PROJECT_LABEL__' in original_content:
-                    print(f"[DEBUG] .gitignore has tokens but content didn't change. Original: {original_content[:100]}")
-        except (UnicodeDecodeError, PermissionError) as e:
+        except (UnicodeDecodeError, PermissionError):
             # Skip binary files or files that can't be read/written
-            if file_path.name == '.gitignore':
-                print(f"[DEBUG] .gitignore exception: {type(e).__name__}: {e}")
             pass
         except Exception as e:
             print(f"[WARNING] Could not update {file_path}: {e}")
-            if file_path.name == '.gitignore':
-                import traceback
-                print(f"[DEBUG] .gitignore traceback: {traceback.format_exc()}")
     
     return renamed_count, updated_count
 
@@ -271,7 +271,8 @@ def check_for_tokens():
     tokens_found = []
     
     # Search in common directories
-    search_dirs = ["force-app", "datasets", "robot", "category"]
+    # Note: .cci directory is included but may not always exist
+    search_dirs = ["force-app", "datasets", "robot", "category", ".cci"]
     
     for search_dir in search_dirs:
         dir_path = Path(search_dir)
@@ -325,6 +326,21 @@ def check_for_tokens():
                     tokens_found.append((org_file, '__PROJECT_LABEL__'))
             except Exception:
                 pass
+    
+    # Check .cci directory (if present)
+    cci_dir = Path(".cci")
+    if cci_dir.exists():
+        cci_snapshot_dir = cci_dir / "snapshot"
+        if cci_snapshot_dir.exists():
+            for cci_file in cci_snapshot_dir.glob("*.json"):
+                try:
+                    content = cci_file.read_text(encoding='utf-8', errors='ignore')
+                    if '__PROJECT_NAME__' in content:
+                        tokens_found.append((cci_file, '__PROJECT_NAME__'))
+                    if '__PROJECT_LABEL__' in content:
+                        tokens_found.append((cci_file, '__PROJECT_LABEL__'))
+                except Exception:
+                    pass
     
     return tokens_found
 
@@ -384,11 +400,35 @@ def main():
     repo_name = args.repo_name or os.getenv('GITHUB_REPOSITORY_NAME') or os.getenv('REPO_NAME')
     non_interactive = args.non_interactive or os.getenv('CI') == 'true'
     
+    # CRITICAL SAFETY CHECK: Prevent running in template repository when in CI mode
+    # This provides defense-in-depth protection (workflow also has this check)
+    if non_interactive:
+        github_repo = os.getenv('GITHUB_REPOSITORY', '').lower()
+        template_repos = [
+            'sdbingham/standard-unlocked-shulman',
+            'sdbingham/standardunlockedshulman'
+        ]
+        
+        if github_repo in template_repos:
+            print("=" * 60)
+            print("❌ ERROR: Template Repository Protection")
+            print("=" * 60)
+            print()
+            print("This script is running in CI mode on the template repository.")
+            print("The template repository should NEVER be modified by this script.")
+            print()
+            print(f"Detected repository: {os.getenv('GITHUB_REPOSITORY', 'unknown')}")
+            print()
+            print("This script should only run in NEW repositories created from the template.")
+            print("Aborting to protect the template repository.")
+            sys.exit(1)
+    
     # Debug output (only in CI mode)
     if non_interactive:
         print(f"[DEBUG] repo_name from args: {args.repo_name}")
         print(f"[DEBUG] GITHUB_REPOSITORY_NAME env: {os.getenv('GITHUB_REPOSITORY_NAME')}")
         print(f"[DEBUG] REPO_NAME env: {os.getenv('REPO_NAME')}")
+        print(f"[DEBUG] GITHUB_REPOSITORY env: {os.getenv('GITHUB_REPOSITORY', 'not set')}")
         print(f"[DEBUG] Final repo_name: {repo_name}")
     
     # Check if we're in a template repository (has tokens but cumulusci.yml has template values)
@@ -396,7 +436,6 @@ def main():
     cumulusci_yml = Path("cumulusci.yml")
     if cumulusci_yml.exists() and not repo_name and not args.project_name:
         try:
-            template_project_name, template_package_name, template_name_managed = get_project_values_from_cumulusci()
             # Check if tokens still exist in key files (indicates this is still a template)
             has_tokens = False
             key_files = [cumulusci_yml, Path("README.md"), Path(".gitignore")]
