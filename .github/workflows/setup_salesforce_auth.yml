@@ -16,17 +16,30 @@ on:
         required: true
         type: string
       username:
-        description: 'Salesforce Username'
-        required: true
+        description: 'Salesforce Username (Required for Username-Password Flow, not needed for External Client App)'
+        required: false
         type: string
       password:
-        description: 'Salesforce Password (⚠️ Will be visible in logs - use a test/dev org)'
-        required: true
+        description: 'Salesforce Password (Required for Username-Password Flow, not needed for External Client App) ⚠️ Will be visible in logs'
+        required: false
         type: string
       security_token:
         description: 'Security Token (leave empty if IP whitelisted)'
         required: false
         type: string
+      client_id:
+        description: 'Client ID (Consumer Key) - Required for External Client Apps. Leave empty to use PlatformCLI for Connected Apps.'
+        required: false
+        type: string
+      client_secret:
+        description: 'Client Secret - Required for External Client Apps (Client Credentials Flow). For Connected Apps with Username-Password flow, provide if using custom Client ID.'
+        required: false
+        type: string
+      use_external_client_app:
+        description: 'Use External Client App (Client Credentials Flow) instead of Username-Password Flow'
+        required: false
+        default: false
+        type: boolean
       secret_name:
         description: 'GitHub Secret Name'
         required: false
@@ -60,6 +73,9 @@ jobs:
           SF_PASSWORD: ${{ github.event.inputs.password }}
           SF_SECURITY_TOKEN: ${{ github.event.inputs.security_token }}
           SF_SERVERURL: ${{ github.event.inputs.org_url }}
+          SF_CLIENT_ID: ${{ github.event.inputs.client_id }}
+          SF_CLIENT_SECRET: ${{ github.event.inputs.client_secret }}
+          USE_EXTERNAL_CLIENT_APP: ${{ github.event.inputs.use_external_client_app }}
         run: |
           python3 << 'PYTHON_SCRIPT'
           import requests
@@ -70,30 +86,102 @@ jobs:
           password = os.getenv('SF_PASSWORD')
           security_token = os.getenv('SF_SECURITY_TOKEN', '')
           server_url = os.getenv('SF_SERVERURL')
+          client_id = os.getenv('SF_CLIENT_ID', '').strip()
+          client_secret = os.getenv('SF_CLIENT_SECRET', '').strip()
+          use_external_client_app = os.getenv('USE_EXTERNAL_CLIENT_APP', 'false').lower() == 'true'
           
           # Validate and normalize org URL
           server_url = server_url.strip()
           if not server_url.startswith('http'):
               server_url = 'https://' + server_url
+          # Remove trailing slash to avoid double slashes
+          server_url = server_url.rstrip('/')
           
-          # Combine password and security token
-          full_password = password + security_token if security_token else password
+          # Validate inputs based on authentication method
+          if use_external_client_app:
+              if not client_id or not client_secret:
+                  print("❌ Error: External Client App requires both Client ID and Client Secret")
+                  exit(1)
+          else:
+              if not username or not password:
+                  print("❌ Error: Username-Password Flow requires both username and password")
+                  exit(1)
+          
+          # Combine password and security token (only for Username-Password flow)
+          full_password = password + security_token if (password and security_token) else (password if password else '')
           
           print("Authenticating to Salesforce...")
-          print(f"Username: {username}")
+          if not use_external_client_app:
+              print(f"Username: {username}")
           print(f"Org URL: {server_url}")
           # Note: Password is not printed for security
           
           # Authenticate using Username-Password OAuth Flow
-          token_url = f"{server_url}/services/oauth2/token"
+          # First, try to determine the login server URL
+          # If it's a custom domain (contains .lightning.force.com or .my.salesforce.com),
+          # we need to extract the login server
+          login_server = server_url
+          if '.lightning.force.com' in server_url:
+              # Extract instance from custom domain
+              instance = server_url.split('.lightning.force.com')[0].replace('https://', '')
+              login_server = f"https://{instance}.my.salesforce.com"
+          elif '.my.salesforce.com' in server_url:
+              # Already a my.salesforce.com URL
+              login_server = server_url
+          elif 'login.salesforce.com' in server_url or 'test.salesforce.com' in server_url:
+              # Standard login servers
+              login_server = server_url
+          else:
+              # Assume it's a custom domain, try to construct login URL
+              # For custom domains, we might need to use the instance URL directly
+              login_server = server_url
           
-          payload = {
-              'grant_type': 'password',
-              'client_id': 'PlatformCLI',  # Standard Salesforce CLI client ID
-              'client_secret': '',  # Not needed for PlatformCLI
-              'username': username,
-              'password': full_password
-          }
+          # Remove trailing slash from login_server to avoid double slashes
+          login_server = login_server.rstrip('/')
+          token_url = f"{login_server}/services/oauth2/token"
+          
+          print(f"Token URL: {token_url}")
+          
+          # Determine authentication method
+          if use_external_client_app:
+              # External Client App - Use Client Credentials Flow
+              if not client_id or not client_secret:
+                  print("❌ Error: External Client App requires both Client ID and Client Secret")
+                  print("   Please provide both Client ID and Client Secret for Client Credentials Flow")
+                  exit(1)
+              
+              print(f"Using External Client App (Client Credentials Flow)")
+              print(f"Client ID: {client_id[:10]}...")
+              
+              # Client Credentials Flow - no username/password needed
+              payload = {
+                  'grant_type': 'client_credentials',
+                  'client_id': client_id,
+                  'client_secret': client_secret
+              }
+          else:
+              # Username-Password Flow (Connected App or PlatformCLI)
+              use_client_id = client_id if client_id else 'PlatformCLI'
+              use_client_secret = client_secret if client_id else ''
+              
+              if client_id:
+                  if client_secret:
+                      print(f"Using Connected App (Username-Password Flow)")
+                      print(f"Client ID: {client_id[:10]}...")
+                  else:
+                      print("❌ Error: Connected App requires Client Secret for Username-Password Flow")
+                      print("   If using External Client App, check 'Use External Client App' option")
+                      exit(1)
+              else:
+                  print("Using PlatformCLI (default Salesforce CLI client)")
+              
+              payload = {
+                  'grant_type': 'password',
+                  'client_id': use_client_id,
+                  'client_secret': use_client_secret,
+                  'username': username,
+                  'password': full_password
+              }
           
           try:
               response = requests.post(token_url, data=payload)
@@ -109,16 +197,38 @@ jobs:
                   print(f"Response: {token_data}")
                   exit(1)
               
-              if not refresh_token:
+              # Client Credentials Flow doesn't return refresh tokens
+              # It returns access tokens that can be refreshed using client credentials
+              if not use_external_client_app and not refresh_token:
                   print("❌ Error: No refresh token received")
                   print("   Refresh tokens are required for persistent authentication")
                   print("   Please ensure your org allows refresh tokens")
                   exit(1)
               
-              # Construct SFDX auth URL
+              # For Client Credentials Flow, we'll use the access token directly
+              # and store client credentials for token refresh
+              if use_external_client_app:
+                  # Store client credentials in the auth URL format
+                  # Format: force://clientId:clientSecret::@instanceUrl
+                  # Note: No refresh token for Client Credentials Flow
+                  auth_url = f"force://{client_id}:{client_secret}::@{instance_url}"
+                  print("⚠️  Note: Client Credentials Flow doesn't provide refresh tokens.")
+                  print("   The auth URL contains client credentials for token refresh.")
+                  # Save auth URL
+                  with open('auth_url.txt', 'w') as f:
+                      f.write(auth_url)
+                  print("✅ Authentication successful")
+                  print("✅ SFDX Auth URL generated (Client Credentials Flow)")
+                  exit(0)
+              
+              # Construct SFDX auth URL for Username-Password Flow
               # Format: force://clientId:clientSecret:refreshToken@instanceUrl
-              # For PlatformCLI, clientId and clientSecret are empty
-              auth_url = f"force://PlatformCLI:::{refresh_token}@{instance_url}"
+              if client_id:
+                  # Connected App with secret (Username-Password Flow)
+                  auth_url = f"force://{use_client_id}:{use_client_secret}:{refresh_token}@{instance_url}"
+              else:
+                  # For PlatformCLI, clientId and clientSecret are empty
+                  auth_url = f"force://PlatformCLI:::{refresh_token}@{instance_url}"
               
               # Save auth URL to file
               with open('auth_url.txt', 'w') as f:
@@ -128,17 +238,76 @@ jobs:
               print("✅ SFDX Auth URL generated")
               
           except requests.exceptions.RequestException as e:
-              print(f"❌ Authentication failed: {e}")
+              error_msg = str(e)
+              error_details = None
+              
               if hasattr(e, 'response') and e.response is not None:
                   try:
                       error_data = e.response.json()
-                      print(f"   Error: {error_data.get('error_description', e.response.text)}")
+                      error_details = error_data.get('error_description', error_data.get('error', e.response.text))
+                      error_msg = error_details
                   except:
-                      print(f"   Response: {e.response.text}")
-              print("\nPlease verify:")
-              print("  - Username and password are correct")
-              print("  - Security token is provided if IP is not whitelisted")
-              print("  - Dev Hub is enabled on the org")
+                      error_details = e.response.text
+              
+              print(f"❌ Authentication failed: {error_msg}")
+              
+              # Provide specific guidance based on error
+              if 'grant type not supported' in error_msg.lower() or 'invalid client' in error_msg.lower():
+                  if use_external_client_app:
+                      print("\n⚠️  Client Credentials Flow failed.")
+                      print("   Please verify:")
+                      print("   - Client ID is correct")
+                      print("   - Client Secret is correct")
+                      print("   - External Client App has 'Client Credentials Flow' enabled")
+                      print("   - The app is saved and active")
+                  elif not client_id:
+                      print("\n⚠️  The Username-Password OAuth flow requires a Connected App.")
+                      print("   The PlatformCLI client ID is not enabled for your org.")
+                      print("\n   To fix this, you have two options:")
+                      print("\n   Option 1: Enable PlatformCLI")
+                      print("   1. Go to Setup > App Manager")
+                      print("   2. Find 'Salesforce CLI' or 'PlatformCLI' Connected App")
+                      print("   3. Edit it and ensure 'Enable OAuth Settings' is checked")
+                      print("   4. Ensure 'Enable Username-Password OAuth Flow' is enabled")
+                      print("   5. Save and try again")
+                      print("\n   Option 2: Use a Connected App")
+                      print("   1. Go to Setup > App Manager > New Connected App")
+                      print("   2. Enable OAuth Settings")
+                      print("   3. Enable 'Enable Username-Password OAuth Flow'")
+                      print("   4. Set Callback URL to: http://localhost:1717/OauthRedirect")
+                      print("   5. Save and note the Consumer Key (Client ID) and Consumer Secret")
+                      print("   6. Re-run this workflow and provide:")
+                      print("      - Client ID: Your Connected App's Consumer Key")
+                      print("      - Client Secret: Your Connected App's Consumer Secret")
+                      print("\n   Option 3: Use External Client App (Client Credentials Flow)")
+                      print("   1. Go to Setup > App Manager > New External Client App")
+                      print("   2. In OAuth Scopes, select:")
+                      print("      - 'Perform requests at any time (refresh_token, offline_access)'")
+                      print("      - At least one additional scope (e.g., 'Full access (full)' or 'Access and manage your data (api)')")
+                      print("      ⚠️  Note: Salesforce requires at least one scope besides refresh_token")
+                      print("   3. Enable 'Client Credentials Flow' in Flow Enablement")
+                      print("   4. Save and note the Client ID and Client Secret")
+                      print("   5. Re-run this workflow with:")
+                      print("      - Check 'Use External Client App'")
+                      print("      - Client ID: Your External Client App's Client ID")
+                      print("      - Client Secret: Your External Client App's Client Secret")
+                  else:
+                      print("\n⚠️  Authentication failed with the provided credentials.")
+                      print("   Please verify:")
+                      print("   - Client ID is correct")
+                      print("   - Client Secret is correct")
+                      print("   - Connected App has 'Enable Username-Password OAuth Flow' enabled")
+                      print("   - Your user has access to the app")
+                      print("   - Username and password are correct")
+                      print("   - Security token is provided if IP is not whitelisted")
+              else:
+                  print("\nPlease verify:")
+                  print("  - Username and password are correct")
+                  print("  - Security token is provided if IP is not whitelisted")
+                  print("  - Dev Hub is enabled on the org")
+                  if error_details:
+                      print(f"\n   Full error details: {error_details}")
+              
               exit(1)
           PYTHON_SCRIPT
           
