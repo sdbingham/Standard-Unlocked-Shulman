@@ -21,13 +21,15 @@ on:
 jobs:
   setup-project:
     runs-on: ubuntu-latest
-    # Skip if commit message contains [skip setup] to prevent infinite loops
-    # Note: github.event.head_commit.message may be null for workflow_dispatch, so we check event type first
-    # Also skip if this is the template repository itself (check if repo name matches template name pattern)
+    # CRITICAL: Skip entire job if this is the template repository
+    # The template repository should NEVER be modified by this workflow
+    # github.repository format: owner/repo-name
+    # This check MUST be first to prevent any execution in the template
+    # Using explicit repository path check - if this is the template, skip ALL steps
     if: |
-      (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == '' || !contains(github.event.head_commit.message, '[skip setup]')) &&
-      !contains(github.repository, 'template') &&
-      !contains(github.repository, 'Template')
+      github.repository != 'sdbingham/Standard-Unlocked-Shulman' &&
+      github.repository != 'sdbingham/standard-unlocked-shulman' &&
+      (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == '' || !contains(github.event.head_commit.message, '[skip setup]'))
     
     steps:
       - name: Checkout repository
@@ -73,11 +75,22 @@ jobs:
 
       - name: Run setup script
         if: steps.check_tokens.outputs.tokens_exist == 'true'
+        timeout-minutes: 10
         env:
           GITHUB_REPOSITORY_NAME: ${{ steps.repo_name.outputs.name }}
           CI: 'true'
         run: |
+          echo "=========================================="
+          echo "Running setup script with repository name"
+          echo "=========================================="
+          echo "Repository name: ${{ steps.repo_name.outputs.name }}"
+          echo "Environment variable GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
+          echo ""
           python setup_new_project.py --repo-name "${{ steps.repo_name.outputs.name }}" --non-interactive
+          echo ""
+          echo "Setup script completed. Checking results..."
+          echo "Project name in cumulusci.yml:"
+          grep -A 1 "project:" cumulusci.yml | grep "name:" || echo "Not found"
 
       - name: Check for changes
         if: steps.check_tokens.outputs.tokens_exist == 'true'
@@ -94,12 +107,52 @@ jobs:
 
       - name: Commit changes
         if: steps.check_tokens.outputs.tokens_exist == 'true' && steps.verify_changes.outputs.changes_exist == 'true'
+        timeout-minutes: 5
         run: |
+          # CRITICAL SAFETY CHECK: Never commit to template repository
+          CURRENT_REPO="${{ github.repository }}"
+          TEMPLATE_REPO="sdbingham/Standard-Unlocked-Shulman"
+          
+          echo "Current repository: $CURRENT_REPO"
+          echo "Template repository: $TEMPLATE_REPO"
+          
+          if [ "$CURRENT_REPO" = "$TEMPLATE_REPO" ]; then
+            echo "❌ ERROR: This is the template repository!"
+            echo "❌ This workflow should NEVER run in the template repository."
+            echo "❌ Aborting to prevent modifying the template."
+            exit 1
+          fi
+          
+          echo "✅ Safety check passed - this is NOT the template repository"
+          echo "This workflow only commits to THIS repository, never to the template."
+          
+          # Configure git
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          
+          # Show current branch and remote
+          echo "Current branch: $(git branch --show-current)"
+          echo "Remote origin URL: $(git remote get-url origin)"
+          
+          # Stage and commit changes
           git add -A
-          git commit -m "chore: Replace project tokens with repository name [skip setup]"
-          git push
+          git commit -m "chore: Replace project tokens with repository name [skip setup]" || {
+            echo "No changes to commit or commit failed"
+            exit 0
+          }
+          
+          # Push ONLY to the current repository's main branch
+          # This will NOT affect the template repository
+          git push origin HEAD:main || {
+            echo "Git push failed. This might be because:"
+            echo "1. The repository is still being created"
+            echo "2. There are no changes to commit"
+            echo "3. Permissions issue"
+            echo "4. Branch protection rules"
+            exit 0
+          }
+          
+          echo "✅ Successfully pushed changes to $CURRENT_REPO main branch"
 
       - name: Summary
         if: always()

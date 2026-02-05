@@ -1,9 +1,9 @@
 minimum_cumulusci_version: "3.78.0"
 project:
-    name: Standard Unlocked Shulman
+    name: __PROJECT_LABEL__
     package:
-        name: StandardUnlockedShulman
-        name_managed: Standard Unlocked Shulman
+        name: __PROJECT_NAME__
+        name_managed: __PROJECT_LABEL__
         api_version: "61.0"
     dependencies:
         - github: https://github.com/Nimba-Solutions/Shulman-Core
@@ -20,14 +20,14 @@ project:
 tasks:
     robot:
         options:
-            suites: robot/Standard-Unlocked-Shulman/tests
+            suites: robot/__PROJECT_LABEL__/tests
             options:
-                outputdir: robot/Standard-Unlocked-Shulman/results
+                outputdir: robot/__PROJECT_LABEL__/results
 
     robot_testdoc:
         options:
-            path: robot/Standard-Unlocked-Shulman/tests
-            output: robot/Standard-Unlocked-Shulman/doc/Standard-Unlocked-Shulman_tests.html
+            path: robot/__PROJECT_LABEL__/tests
+            output: robot/__PROJECT_LABEL__/doc/__PROJECT_LABEL___tests.html
 
     run_tests:
         options:
@@ -58,8 +58,8 @@ tasks:
     assign_permission_set_groups:
         class_path: tasks.permsets.AssignPermissionSetGroupsWithFindReplace
         options:
-            api_names: StandardUnlockedShulmanAdmin
-            # Note: setup_new_project.py will permanently replace StandardUnlockedShulman 
+            api_names: __PROJECT_NAME__Admin
+            # Note: setup_new_project.py will permanently replace __PROJECT_NAME__ 
             # with the package name (e.g., YourProjectName)
             # Transforms are not needed since tokens are replaced permanently
 
