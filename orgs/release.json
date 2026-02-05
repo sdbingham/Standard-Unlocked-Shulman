@@ -1,5 +1,5 @@
 {
-  "orgName": "Standard-Unlocked - Release Test Org",
+  "orgName": "Standard-Unlocked-Shulman - Release Test Org",
   "edition": "Enterprise",
   "settings": {
     "lightningExperienceSettings": {
@@ -16,5 +16,18 @@
       "sessionSettings": {
         "forceRelogin": false
       }
-    }  }
+    },
+    "languageSettings": {
+      "enableTranslationWorkbench": true
+    },
+    "enhancedNotesSettings": {
+      "enableEnhancedNotes": true
+    },
+    "emailAdministrationSettings": {
+      "enableEnhancedEmailEnabled": true
+    },
+    "apexSettings": {
+      "enableCompileOnDeploy": true
+    }
+  }
 }

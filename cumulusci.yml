@@ -1,11 +1,12 @@
 minimum_cumulusci_version: "3.78.0"
 project:
-    name: Standard Unlocked
+    name: Standard Unlocked Shulman
     package:
-        name: StandardUnlocked
-        name_managed: Standard Unlocked
+        name: StandardUnlockedShulman
+        name_managed: Standard Unlocked Shulman
         api_version: "61.0"
-    # dependencies:
+    dependencies:
+        - github: https://github.com/Nimba-Solutions/Shulman-Core
     #     - version_id: 04t8b000001ZxNVAA0 # FlowActionsBasePack Version: 3.18
     #     - version_id: 04t5G000004fz7mQAA # FlowScreenComponentsBasePack Version: 3.3.4
     #     - version_id: 04t5G0000043xu3QAA # https://unofficialsf.com/from-josh-dayment-improved-file-upload-in-flow-screens/
@@ -19,26 +20,26 @@ project:
 tasks:
     robot:
         options:
-            suites: robot/Standard-Unlocked/tests
+            suites: robot/Standard-Unlocked-Shulman/tests
             options:
-                outputdir: robot/Standard-Unlocked/results
+                outputdir: robot/Standard-Unlocked-Shulman/results
 
     robot_testdoc:
         options:
-            path: robot/Standard-Unlocked/tests
-            output: robot/Standard-Unlocked/doc/Standard-Unlocked_tests.html
+            path: robot/Standard-Unlocked-Shulman/tests
+            output: robot/Standard-Unlocked-Shulman/doc/Standard-Unlocked-Shulman_tests.html
 
     run_tests:
         options:
             required_org_code_coverage_percent: 75
 
-    # CumulusCI ships with both `retrieve_changes`, `permsets` and `deploy` tasks out of the box, '
-    # but they don't provide sufficient find/replace functionality so this project
-    # ships with custom wrapper tasks:
+    # CumulusCI ships with both `retrieve_changes`, `permsets`, `deploy`, and `create_package_version` tasks out of the box.
+    # This project ships with custom wrapper tasks:
     # └── 📁 tasks/
     #     ├── 📄 retrieve_changes.py
     #     ├── 📄 permsets.py
-    #     └── 📄 deploy.py
+    #     ├── 📄 deploy.py
+    #     └── 📄 create_package_version.py
     retrieve_changes:
         class_path: tasks.retrieve_changes.RetrieveChanges
         options:
@@ -46,6 +47,18 @@ tasks:
     deploy:
         class_path: tasks.deploy.Deploy
         options:
+            transforms:
+                - transform: find_replace
+                  options:
+                      patterns:
+                          - find: "__PROJECT_NAME__"
+                            replace: $project_config.project__package__name
+                          - find: "__PROJECT_LABEL__"
+                            replace: $project_config.project__package__name_managed
+    create_package_version:
+        class_path: tasks.create_package_version.CreatePackageVersion
+        options:
+            package_type: Unlocked
             transforms:
                 - transform: find_replace
                   options:

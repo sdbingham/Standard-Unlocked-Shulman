@@ -1,4 +1,4 @@
-# Standard-Unlocked
+# Standard-Unlocked-Shulman
 
 This repository contains everything you need to realize enterprise-grade Salesforce CICD practices without making an enterprise-grade investment. 
 
@@ -16,7 +16,7 @@ We strongly advocate adhering to a "Release Train" development methodology for S
 1. Fork this repository.
 2. Make a _new_ Repository in your organization and select your fork as the `Repository Template`
 3. Modify the `name` and `name_managed` fields in [cumulusci.yml](cumulusci.yml)<sup>1</sup>
-4. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Standard-Unlocked/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
+4. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
 
 > [!NOTE]
 > 1. As you explore this project, you may notice a large number of tokens such as     `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml), and will be automatically exchanged via *token injection* when running CCI commands.
@@ -37,7 +37,7 @@ We strongly advocate adhering to a "Release Train" development methodology for S
 
 ### [Recommended] Release this project using the Built-in CICD Actions
 
-Follow the provided [`Release` instructions](https://github.com/Nimba-Solutions/Standard-Unlocked/blob/main/.github/workflows/README.md#releases).
+Follow the provided [`Release` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#releases).
 
 
 ---
@@ -59,3 +59,6 @@ Follow the provided [`Release` instructions](https://github.com/Nimba-Solutions/
 3. Run `cci flow run release_unlocked_production --org dev --debug` to release a new beta version of this package.
 4. Run `cci org browser dev` to open the org in your browser.
 5. [OPTIONAL] Run `cci flow run install_prod --org <target-org-alias>` to install the package and _all of its dependencies_ in `<target-org-alias>`.
+
+
+=====================================

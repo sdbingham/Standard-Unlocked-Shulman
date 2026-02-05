@@ -7,5 +7,6 @@ CREATE TABLE "Account" (
 	"Name" VARCHAR(255), 
 	PRIMARY KEY (id)
 );
-INSERT INTO "Account" VALUES(1,'5551238765','Prospect','Biotechnology','Acme');
+-- No sample data inserted due to Litify PM validation rule conflicts
+-- Litify PM requires Account names to satisfy a "last name" validation rule
 COMMIT;

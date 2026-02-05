@@ -1,5 +1,5 @@
 {
-  "orgName": "Standard-Unlocked - Feature Test Org",
+  "orgName": "Standard-Unlocked-Shulman - Feature Test Org",
   "edition": "Developer",
   "settings": {
     "lightningExperienceSettings": {
@@ -19,6 +19,15 @@
     },
     "languageSettings": {
       "enableTranslationWorkbench": true
+    },
+    "enhancedNotesSettings": {
+      "enableEnhancedNotes": true
+    },
+    "emailAdministrationSettings": {
+      "enableEnhancedEmailEnabled": true
+    },
+    "apexSettings": {
+      "enableCompileOnDeploy": true
     }
   }
 }
