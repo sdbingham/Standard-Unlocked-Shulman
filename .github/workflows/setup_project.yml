@@ -33,8 +33,7 @@ jobs:
       github.repository != 'sdbingham/StandardUnlockedShulman' &&
       github.repository != 'sdbingham/STANDARD-UNLOCKED-SHULMAN' &&
       (github.event_name == 'workflow_dispatch' || 
-       github.event.head_commit.message == '' || 
-       contains(github.event.head_commit.message, 'Initial commit'))
+       github.event.head_commit.message == 'Initial commit')
     
     steps:
       - name: Checkout repository
@@ -156,7 +155,7 @@ jobs:
           
           # Stage and commit changes
           git add -A
-          git commit -m "chore: Replace project tokens with repository name [skip setup]" || {
+          git commit -m "Replace project tokens with repository name [skip setup]" || {
             echo "No changes to commit or commit failed"
             exit 0
           }
