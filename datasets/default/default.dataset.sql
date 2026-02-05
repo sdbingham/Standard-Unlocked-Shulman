@@ -5,8 +5,8 @@ CREATE TABLE "Account" (
 	"Type" VARCHAR(255), 
 	"Industry" VARCHAR(255), 
 	"Name" VARCHAR(255), 
+	"litify_pm__Last_Name__c" VARCHAR(255), 
 	PRIMARY KEY (id)
 );
--- No sample data inserted due to Litify PM validation rule conflicts
--- Litify PM requires Account names to satisfy a "last name" validation rule
+INSERT INTO "Account" VALUES(1,'5551238765','Prospect','Biotechnology','Acme','Acme');
 COMMIT;
