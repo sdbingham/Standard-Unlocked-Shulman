@@ -32,7 +32,9 @@ jobs:
       github.repository != 'sdbingham/standard-unlocked-shulman' &&
       github.repository != 'sdbingham/StandardUnlockedShulman' &&
       github.repository != 'sdbingham/STANDARD-UNLOCKED-SHULMAN' &&
-      (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == '' || !contains(github.event.head_commit.message, '[skip setup]'))
+      (github.event_name == 'workflow_dispatch' || 
+       github.event.head_commit.message == '' || 
+       contains(github.event.head_commit.message, 'Initial commit'))
     
     steps:
       - name: Checkout repository
@@ -61,8 +63,15 @@ jobs:
             echo "Note: This workflow replaces tokens in the NEW repository, not the template repository."
           else
             echo "tokens_exist=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No tokens found - setup already complete or not needed"
+            echo "ℹ️ No tokens found - setup already complete, skipping workflow"
           fi
+      
+      - name: Skip if tokens already replaced
+        if: steps.check_tokens.outputs.tokens_exist != 'true'
+        run: |
+          echo "⏭️ Setup already completed - no tokens found in repository"
+          echo "This workflow only runs when tokens need to be replaced."
+          exit 0
 
       - name: Extract repository name
         id: repo_name
