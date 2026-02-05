@@ -384,6 +384,48 @@ def main():
     repo_name = args.repo_name or os.getenv('GITHUB_REPOSITORY_NAME') or os.getenv('REPO_NAME')
     non_interactive = args.non_interactive or os.getenv('CI') == 'true'
     
+    # Debug output (only in CI mode)
+    if non_interactive:
+        print(f"[DEBUG] repo_name from args: {args.repo_name}")
+        print(f"[DEBUG] GITHUB_REPOSITORY_NAME env: {os.getenv('GITHUB_REPOSITORY_NAME')}")
+        print(f"[DEBUG] REPO_NAME env: {os.getenv('REPO_NAME')}")
+        print(f"[DEBUG] Final repo_name: {repo_name}")
+    
+    # Check if we're in a template repository (has tokens but cumulusci.yml has template values)
+    # This prevents accidentally running the script in the template repo
+    cumulusci_yml = Path("cumulusci.yml")
+    if cumulusci_yml.exists() and not repo_name and not args.project_name:
+        try:
+            template_project_name, template_package_name, template_name_managed = get_project_values_from_cumulusci()
+            # Check if tokens still exist in key files (indicates this is still a template)
+            has_tokens = False
+            key_files = [cumulusci_yml, Path("README.md"), Path(".gitignore")]
+            for key_file in key_files:
+                if key_file.exists():
+                    content = key_file.read_text(encoding='utf-8', errors='ignore')
+                    if '__PROJECT_NAME__' in content or '__PROJECT_LABEL__' in content:
+                        has_tokens = True
+                        break
+            
+            # If tokens exist and no repo_name provided, warn user
+            if has_tokens and not non_interactive:
+                print("=" * 60)
+                print("⚠️  WARNING: Template Repository Detected")
+                print("=" * 60)
+                print()
+                print("This appears to be a template repository with tokens.")
+                print("The script should be run in a NEW repository created from this template.")
+                print()
+                print("If you want to run it here anyway, provide --repo-name:")
+                print("  python setup_new_project.py --repo-name 'Your-New-Project-Name'")
+                print()
+                confirm = input("Continue anyway? (y/n): ").strip().lower()
+                if confirm != 'y':
+                    print("Cancelled.")
+                    sys.exit(0)
+        except Exception:
+            pass  # If we can't check, continue normally
+    
     print("=" * 60)
     print("Project Token Replacement Script")
     print("=" * 60)
@@ -410,22 +452,35 @@ def main():
     # This takes precedence over cumulusci.yml because when using a template,
     # the repository name is the source of truth, not the template's cumulusci.yml
     elif repo_name:
+        # ALWAYS use repository name when provided - NEVER read from cumulusci.yml
+        # This is critical for template repositories where cumulusci.yml contains tokens
         project_name, package_name, name_managed = derive_project_values(repo_name)
-        print(f"Derived values from repository name '{repo_name}':")
+        print(f"✅ Using repository name '{repo_name}' to derive project values:")
         print(f"  Project Name: {project_name}")
         print(f"  Package Name: {package_name}")
         print(f"  Name Managed: {name_managed}")
         print()
-        print("Note: Using repository name instead of cumulusci.yml values.")
-        print("The script will update cumulusci.yml with these values.")
+        print("⚠️  IMPORTANT: Ignoring any values in cumulusci.yml.")
+        print("   The repository name is the source of truth for template repositories.")
+        print("   cumulusci.yml will be updated with these values.")
     # Priority 3: Try to read from cumulusci.yml (fallback when no repo name provided)
     else:
         project_name, package_name, name_managed = get_project_values_from_cumulusci()
+        # Check if the values are actually tokens (should not be used)
         if project_name and package_name and name_managed:
-            print("Found values in cumulusci.yml:")
-            print(f"  Project Name: {project_name}")
-            print(f"  Package Name: {package_name}")
-            print(f"  Name Managed: {name_managed}")
+            # If values contain tokens, they're not real values - treat as None
+            if '__PROJECT_NAME__' in project_name or '__PROJECT_LABEL__' in project_name or \
+               '__PROJECT_NAME__' in package_name or '__PROJECT_LABEL__' in package_name or \
+               '__PROJECT_NAME__' in name_managed or '__PROJECT_LABEL__' in name_managed:
+                print("Warning: cumulusci.yml contains tokens, not actual values. Skipping.")
+                project_name = None
+                package_name = None
+                name_managed = None
+            else:
+                print("Found values in cumulusci.yml:")
+                print(f"  Project Name: {project_name}")
+                print(f"  Package Name: {package_name}")
+                print(f"  Name Managed: {name_managed}")
     
     # If we still don't have values, prompt (unless non-interactive)
     if not (project_name and package_name and name_managed):
