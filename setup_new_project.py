@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Setup script for replacing project tokens in a new project from the template.
+
+This script permanently replaces __PROJECT_NAME__ and __PROJECT_LABEL__ tokens in:
+- Filenames (e.g., __PROJECT_NAME__Home.flexipage-meta.xml -> YourProjectNameHome.flexipage-meta.xml)
+- File contents
+- Directory names (e.g., robot/__PROJECT_LABEL__/ -> robot/Your-Project-Name/)
+
+Run this script once at the beginning of a new project setup.
+"""
+
+import re
+import sys
+from pathlib import Path
+
+# Set UTF-8 encoding for stdout/stderr on Windows
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
+def get_project_values_from_cumulusci():
+    """Read project name, package name, and name_managed from cumulusci.yml."""
+    file_path = Path("cumulusci.yml")
+    
+    if not file_path.exists():
+        return None, None, None
+    
+    try:
+        content = file_path.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        content = file_path.read_text(encoding='latin-1')
+    
+    # Extract values using regex
+    project_name_match = re.search(r'project:\s*\n\s*name:\s*"([^"]+)"', content)
+    package_name_match = re.search(r'package:\s*\n\s*name:\s*(\w+)', content)
+    name_managed_match = re.search(r'name_managed:\s*"([^"]+)"', content)
+    
+    project_name = project_name_match.group(1) if project_name_match else None
+    package_name = package_name_match.group(1) if package_name_match else None
+    name_managed = name_managed_match.group(1) if name_managed_match else None
+    
+    return project_name, package_name, name_managed
+
+
+def replace_tokens_in_files(package_name: str, name_managed: str):
+    """Replace __PROJECT_NAME__ and __PROJECT_LABEL__ tokens in filenames and file contents."""
+    renamed_count = 0
+    updated_count = 0
+    
+    # Rename directories with tokens in their names
+    # First, handle robot/__PROJECT_LABEL__ directory
+    robot_token_dir = Path("robot/__PROJECT_LABEL__")
+    if robot_token_dir.exists():
+        # Use name_managed format (spaces -> hyphens) for robot directory name
+        robot_project_name = name_managed.replace(" ", "-")
+        robot_new_dir = Path("robot") / robot_project_name
+        try:
+            if robot_new_dir.exists():
+                print(f"[WARNING] Robot directory {robot_new_dir} already exists, skipping rename")
+            else:
+                robot_token_dir.rename(robot_new_dir)
+                print(f"[OK] Renamed robot/__PROJECT_LABEL__ -> robot/{robot_project_name}")
+                renamed_count += 1
+        except Exception as e:
+            print(f"[WARNING] Could not rename robot/__PROJECT_LABEL__ directory: {e}")
+    
+    # First, update cumulusci.yml to replace tokens in config
+    cumulusci_yml = Path("cumulusci.yml")
+    if cumulusci_yml.exists():
+        try:
+            content = cumulusci_yml.read_text(encoding='utf-8')
+            original_content = content
+            
+            # Replace tokens in cumulusci.yml
+            # __PROJECT_NAME__ -> package_name (spaces removed, e.g., YourProjectName)
+            # __PROJECT_LABEL__ -> name_managed with hyphens (spaces -> hyphens, e.g., Your-Project-Name)
+            name_managed_hyphenated = name_managed.replace(" ", "-")
+            content = content.replace('__PROJECT_NAME__', package_name)
+            content = content.replace('__PROJECT_LABEL__', name_managed_hyphenated)
+            
+            if content != original_content:
+                cumulusci_yml.write_text(content, encoding='utf-8')
+                print(f"[OK] Updated cumulusci.yml")
+                updated_count += 1
+        except Exception as e:
+            print(f"[WARNING] Could not update cumulusci.yml: {e}")
+    
+    # Search in common directories
+    search_dirs = ["force-app", "datasets", "robot", "category"]
+    
+    # First pass: rename directories and files with tokens
+    for search_dir in search_dirs:
+        dir_path = Path(search_dir)
+        if not dir_path.exists():
+            continue
+        
+        # Rename directories with tokens (process from deepest to shallowest)
+        dirs_to_rename = []
+        for dir_path_item in sorted(dir_path.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            if dir_path_item.is_dir():
+                if '__PROJECT_NAME__' in dir_path_item.name:
+                    dirs_to_rename.append((dir_path_item, '__PROJECT_NAME__', package_name))
+                elif '__PROJECT_LABEL__' in dir_path_item.name:
+                    dirs_to_rename.append((dir_path_item, '__PROJECT_LABEL__', name_managed.replace(" ", "-")))
+        
+        for dir_path_item, token, replacement in dirs_to_rename:
+            try:
+                new_name = dir_path_item.name.replace(token, replacement)
+                new_path = dir_path_item.parent / new_name
+                # Avoid renaming if target already exists
+                if new_path.exists() and new_path != dir_path_item:
+                    print(f"[WARNING] Target directory already exists, skipping: {new_path}")
+                    continue
+                dir_path_item.rename(new_path)
+                print(f"[OK] Renamed directory {dir_path_item.relative_to(Path.cwd())} -> {new_path.name}")
+                renamed_count += 1
+            except Exception as e:
+                print(f"[WARNING] Could not rename directory {dir_path_item}: {e}")
+        
+        # Rename files with tokens
+        files_to_rename = []
+        for file_path in dir_path.rglob("*"):
+            if file_path.is_file() and '__PROJECT_NAME__' in file_path.name:
+                files_to_rename.append(file_path)
+        
+        for file_path in files_to_rename:
+            try:
+                new_name = file_path.name.replace('__PROJECT_NAME__', package_name)
+                new_path = file_path.parent / new_name
+                # Avoid renaming if target already exists
+                if new_path.exists() and new_path != file_path:
+                    print(f"[WARNING] Target file already exists, skipping: {new_path}")
+                    continue
+                file_path.rename(new_path)
+                print(f"[OK] Renamed {file_path.relative_to(Path.cwd())} -> {new_path.name}")
+                renamed_count += 1
+            except Exception as e:
+                print(f"[WARNING] Could not rename {file_path}: {e}")
+    
+    # Second pass: update file contents (including renamed files)
+    all_files = []
+    for search_dir in search_dirs:
+        dir_path = Path(search_dir)
+        if dir_path.exists():
+            all_files.extend(dir_path.rglob("*"))
+    
+    # Also include root-level files and orgs directory
+    root_files = [Path(".gitignore"), Path("sfdx-project.json"), Path("README.md")]
+    for root_file in root_files:
+        if root_file.exists():
+            all_files.append(root_file)
+    
+    # Include orgs directory files
+    orgs_dir = Path("orgs")
+    if orgs_dir.exists():
+        all_files.extend(orgs_dir.glob("*.json"))
+    
+    for file_path in all_files:
+        if not file_path.is_file():
+            continue
+        
+        # Skip certain file types and directories
+        skip_patterns = ['.git', '__pycache__', '.pyc', 'node_modules', 'cumulusci.yml']
+        if any(pattern in str(file_path) for pattern in skip_patterns):
+            continue
+        
+        try:
+            # Try to read as text
+            content = file_path.read_text(encoding='utf-8', errors='ignore')
+            original_content = content
+            
+            # Replace tokens in content
+            # __PROJECT_LABEL__ should use hyphenated format for paths and org names
+            name_managed_hyphenated = name_managed.replace(" ", "-")
+            content = content.replace('__PROJECT_NAME__', package_name)
+            content = content.replace('__PROJECT_LABEL__', name_managed_hyphenated)
+            
+            if content != original_content:
+                file_path.write_text(content, encoding='utf-8')
+                rel_path = file_path.relative_to(Path.cwd())
+                print(f"[OK] Updated {rel_path}")
+                updated_count += 1
+        except (UnicodeDecodeError, PermissionError):
+            # Skip binary files or files that can't be read/written
+            pass
+        except Exception as e:
+            print(f"[WARNING] Could not update {file_path}: {e}")
+    
+    return renamed_count, updated_count
+
+
+def check_for_tokens():
+    """Check for any remaining __PROJECT_NAME__ or __PROJECT_LABEL__ tokens."""
+    tokens_found = []
+    
+    # Search in common directories
+    search_dirs = ["force-app", "datasets", "robot", "category"]
+    
+    for search_dir in search_dirs:
+        dir_path = Path(search_dir)
+        if not dir_path.exists():
+            continue
+        
+        for file_path in dir_path.rglob("*"):
+            if file_path.is_file():
+                try:
+                    # Check filename
+                    if '__PROJECT_NAME__' in file_path.name or '__PROJECT_LABEL__' in file_path.name:
+                        tokens_found.append((file_path, 'filename'))
+                    
+                    # Check content
+                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    if '__PROJECT_NAME__' in content:
+                        tokens_found.append((file_path, '__PROJECT_NAME__'))
+                    if '__PROJECT_LABEL__' in content:
+                        tokens_found.append((file_path, '__PROJECT_LABEL__'))
+                except Exception:
+                    # Skip binary files or files that can't be read
+                    pass
+    
+    # Also check root-level files and orgs directory
+    root_files = [Path(".gitignore"), Path("sfdx-project.json"), Path("README.md"), Path("cumulusci.yml")]
+    for root_file in root_files:
+        if root_file.exists():
+            try:
+                # Check filename (unlikely but possible)
+                if '__PROJECT_NAME__' in root_file.name or '__PROJECT_LABEL__' in root_file.name:
+                    tokens_found.append((root_file, 'filename'))
+                
+                # Check content
+                content = root_file.read_text(encoding='utf-8', errors='ignore')
+                if '__PROJECT_NAME__' in content:
+                    tokens_found.append((root_file, '__PROJECT_NAME__'))
+                if '__PROJECT_LABEL__' in content:
+                    tokens_found.append((root_file, '__PROJECT_LABEL__'))
+            except Exception:
+                pass
+    
+    # Check orgs directory
+    orgs_dir = Path("orgs")
+    if orgs_dir.exists():
+        for org_file in orgs_dir.glob("*.json"):
+            try:
+                content = org_file.read_text(encoding='utf-8', errors='ignore')
+                if '__PROJECT_NAME__' in content:
+                    tokens_found.append((org_file, '__PROJECT_NAME__'))
+                if '__PROJECT_LABEL__' in content:
+                    tokens_found.append((org_file, '__PROJECT_LABEL__'))
+            except Exception:
+                pass
+    
+    return tokens_found
+
+
+def main():
+    """Main setup function."""
+    print("=" * 60)
+    print("Project Token Replacement Script")
+    print("=" * 60)
+    print()
+    print("This script permanently replaces __PROJECT_NAME__ and __PROJECT_LABEL__")
+    print("tokens in filenames and file contents.")
+    print()
+    
+    # Try to read values from cumulusci.yml
+    project_name, package_name, name_managed = get_project_values_from_cumulusci()
+    
+    if project_name and package_name and name_managed:
+        print("Found values in cumulusci.yml:")
+        print(f"  Project Name: {project_name}")
+        print(f"  Package Name: {package_name}")
+        print(f"  Name Managed: {name_managed}")
+        print()
+        confirm = input("Use these values to replace tokens? (y/n): ").strip().lower()
+        if confirm != 'y':
+            print("Cancelled.")
+            sys.exit(0)
+    else:
+        # Prompt for values
+        print("Could not read values from cumulusci.yml.")
+        print("Please provide the following values:")
+        print()
+        project_name = input("Project Name (e.g., 'Shulman Intake Platform'): ").strip()
+        if not project_name:
+            print("Error: Project name is required!")
+            sys.exit(1)
+        
+        # Derive values from project name
+        package_name = project_name.replace(" ", "")
+        name_managed = project_name.replace(" ", "-")
+        
+        print()
+        print("Derived values:")
+        print(f"  Package Name: {package_name} (spaces removed)")
+        print(f"  Name Managed: {name_managed} (spaces -> hyphens)")
+        print()
+        confirm = input("Continue with these values? (y/n): ").strip().lower()
+        if confirm != 'y':
+            print("Cancelled.")
+            sys.exit(0)
+    
+    # Replace tokens
+    print()
+    print("=" * 60)
+    print("Replacing Tokens")
+    print("=" * 60)
+    print()
+    renamed_count, updated_count = replace_tokens_in_files(package_name, name_managed)
+    
+    if renamed_count > 0 or updated_count > 0:
+        print()
+        print(f"[OK] Renamed {renamed_count} file(s) and updated {updated_count} file(s)")
+    else:
+        print()
+        print("[OK] No files needed token replacement")
+    
+    # Check for remaining tokens
+    print()
+    print("=" * 60)
+    print("Checking for Remaining Tokens")
+    print("=" * 60)
+    print()
+    tokens_found = check_for_tokens()
+    
+    if tokens_found:
+        print(f"[WARNING] Found {len(tokens_found)} file(s) with remaining tokens:")
+        for file_path, token in tokens_found:
+            print(f"  - {file_path} ({token})")
+        print()
+        print("These files need manual token replacement.")
+    else:
+        print("[OK] No remaining tokens found.")
+    
+    print()
+    print("=" * 60)
+    print("Setup Complete!")
+    print("=" * 60)
+    print()
+    print("Next steps:")
+    print("  1. Review the changes made")
+    print("  2. Commit the changes to git")
+    print("  3. Continue with your project setup")
+    print()
+
+
+if __name__ == "__main__":
+    main()

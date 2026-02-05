@@ -20,14 +20,14 @@ project:
 tasks:
     robot:
         options:
-            suites: robot/Standard-Unlocked-Shulman/tests
+            suites: robot/__PROJECT_LABEL__/tests
             options:
-                outputdir: robot/Standard-Unlocked-Shulman/results
+                outputdir: robot/__PROJECT_LABEL__/results
 
     robot_testdoc:
         options:
-            path: robot/Standard-Unlocked-Shulman/tests
-            output: robot/Standard-Unlocked-Shulman/doc/Standard-Unlocked-Shulman_tests.html
+            path: robot/__PROJECT_LABEL__/tests
+            output: robot/__PROJECT_LABEL__/doc/__PROJECT_LABEL___tests.html
 
     run_tests:
         options:
@@ -38,40 +38,29 @@ tasks:
     # └── 📁 tasks/
     #     ├── 📄 retrieve_changes.py
     #     ├── 📄 permsets.py
-    #     ├── 📄 deploy.py
-    #     └── 📄 create_package_version.py
+    #     └── 📄 deploy.py
+    # Note: create_package_version uses CumulusCI's built-in task directly.
+    # Tokens should be replaced using setup_new_project.py before creating packages.
     retrieve_changes:
         class_path: tasks.retrieve_changes.RetrieveChanges
-        options:
-            preserve_tokens: "__PROJECT_NAME__,__PROJECT_LABEL__"
+        # Note: preserve_tokens removed - tokens should be replaced permanently
+        # using setup_new_project.py before development begins
     deploy:
         class_path: tasks.deploy.Deploy
-        options:
-            transforms:
-                - transform: find_replace
-                  options:
-                      patterns:
-                          - find: "__PROJECT_NAME__"
-                            replace: $project_config.project__package__name
-                          - find: "__PROJECT_LABEL__"
-                            replace: $project_config.project__package__name_managed
+        # Note: Transforms removed - tokens should be replaced permanently
+        # using setup_new_project.py before deployment
     create_package_version:
-        class_path: tasks.create_package_version.CreatePackageVersion
         options:
             package_type: Unlocked
-            transforms:
-                - transform: find_replace
-                  options:
-                      patterns:
-                          - find: "__PROJECT_NAME__"
-                            replace: $project_config.project__package__name
-                          - find: "__PROJECT_LABEL__"
-                            replace: $project_config.project__package__name_managed
+            # Note: Tokens should be replaced permanently using setup_new_project.py
+            # before creating packages. Run: python setup_new_project.py
 
     assign_permission_set_groups:
-        class_path: tasks.permsets.AssignPermissionSetsWithFindReplace
+        class_path: tasks.permsets.AssignPermissionSetGroupsWithFindReplace
         options:
             api_names: __PROJECT_NAME__Admin
+            # Note: Transforms will be removed after setup_new_project.py runs
+            # The api_names token will be permanently replaced
             transforms:
                 - transform: find_replace
                   options:

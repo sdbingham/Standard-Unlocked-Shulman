@@ -1,4 +1,4 @@
-# Standard-Unlocked-Shulman
+# __PROJECT_LABEL__
 
 This repository contains everything you need to realize enterprise-grade Salesforce CICD practices without making an enterprise-grade investment. 
 
@@ -16,10 +16,24 @@ We strongly advocate adhering to a "Release Train" development methodology for S
 1. Fork this repository.
 2. Make a _new_ Repository in your organization and select your fork as the `Repository Template`
 3. Modify the `name` and `name_managed` fields in [cumulusci.yml](cumulusci.yml)<sup>1</sup>
-4. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
+4. Run the setup script to replace all project tokens:
+   ```bash
+   python setup_new_project.py
+   ```
+   This script will:
+   - Read project values from `cumulusci.yml` (or prompt you for them)
+   - Permanently replace `__PROJECT_NAME__` and `__PROJECT_LABEL__` tokens in all filenames and file contents
+   - Rename directories (e.g., `robot/__PROJECT_LABEL__/` → `robot/Your-Project-Name/`)
+   - Update all configuration files (`.gitignore`, `sfdx-project.json`, `orgs/*.json`, etc.)
+5. Review and commit the changes:
+   ```bash
+   git add .
+   git commit -m "Replace project tokens with actual project name"
+   ```
+6. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
 
 > [!NOTE]
-> 1. As you explore this project, you may notice a large number of tokens such as     `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml), and will be automatically exchanged via *token injection* when running CCI commands.
+> 1. As you explore this project, you may notice a large number of tokens such as `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml). **Run `setup_new_project.py` once at project initialization** to permanently replace these tokens. After that, all files will use your actual project name.
 
 ## Development
 
