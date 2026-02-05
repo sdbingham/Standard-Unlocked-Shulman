@@ -8,7 +8,7 @@
         <name>backgroundComponents</name>
         <type>Background</type>
     </flexiPageRegions>
-    <masterLabel>Standard-Unlocked-Shulman Admin UtilityBar</masterLabel>
+    <masterLabel>__PROJECT_LABEL__ Admin UtilityBar</masterLabel>
     <template>
         <name>one:utilityBarTemplateDesktop</name>
         <properties>

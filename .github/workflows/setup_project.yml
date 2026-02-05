@@ -23,7 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     # Skip if commit message contains [skip setup] to prevent infinite loops
     # Note: github.event.head_commit.message may be null for workflow_dispatch, so we check event type first
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == '' || !contains(github.event.head_commit.message, '[skip setup]')
+    # Also skip if this is the template repository itself (check if repo name matches template name pattern)
+    if: |
+      (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == '' || !contains(github.event.head_commit.message, '[skip setup]')) &&
+      !contains(github.repository, 'template') &&
+      !contains(github.repository, 'Template')
     
     steps:
       - name: Checkout repository
@@ -40,6 +44,7 @@ jobs:
         id: check_tokens
         run: |
           # Check if tokens exist in the repository (excluding .git directory and setup script itself)
+          # This workflow should only run in NEW repositories created from the template, not in the template itself
           if grep -r "__PROJECT_NAME__\|__PROJECT_LABEL__" \
             --include="*.yml" --include="*.yaml" --include="*.json" \
             --include="*.xml" --include="*.cls" --include="*.py" \
@@ -48,6 +53,7 @@ jobs:
             . 2>/dev/null | grep -v "setup_new_project.py" | head -1; then
             echo "tokens_exist=true" >> $GITHUB_OUTPUT
             echo "✅ Tokens found - setup will run"
+            echo "Note: This workflow replaces tokens in the NEW repository, not the template repository."
           else
             echo "tokens_exist=false" >> $GITHUB_OUTPUT
             echo "ℹ️ No tokens found - setup already complete or not needed"
