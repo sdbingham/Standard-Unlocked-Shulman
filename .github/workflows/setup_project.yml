@@ -6,11 +6,11 @@
 name: Setup Project
 
 on:
-  # Trigger automatically on push to main (happens when repository is created from template)
+  # Trigger on push, but will exit immediately if not "Initial commit"
+  # We use a marker file approach to prevent repeated runs
   push:
     branches:
       - main
-  # Allow manual trigger as fallback
   workflow_dispatch:
     inputs:
       repo_name:
@@ -33,7 +33,7 @@ jobs:
       github.repository != 'sdbingham/StandardUnlockedShulman' &&
       github.repository != 'sdbingham/STANDARD-UNLOCKED-SHULMAN' &&
       (github.event_name == 'workflow_dispatch' || 
-       github.event.head_commit.message == 'Initial commit')
+       (github.event_name == 'push' && github.event.head_commit.message == 'Initial commit'))
     
     steps:
       - name: Checkout repository
@@ -41,12 +41,38 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Exit if not Initial commit
+        if: github.event_name == 'push'
+        run: |
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          if [ "$COMMIT_MSG" != "Initial commit" ]; then
+            echo "⏭️ Skipping - commit message is not 'Initial commit'"
+            echo "This workflow only runs on 'Initial commit' commits"
+            # Exit with success code to prevent showing as failed
+            exit 0
+          fi
+          echo "✅ Commit message is 'Initial commit' - proceeding"
+
+      - name: Check if setup already completed
+        id: check_setup
+        run: |
+          if [ -f ".setup-complete" ]; then
+            echo "setup_complete=true" >> $GITHUB_OUTPUT
+            echo "⏭️ Setup already completed (.setup-complete file exists)"
+            exit 0
+          else
+            echo "setup_complete=false" >> $GITHUB_OUTPUT
+            echo "✅ Setup not yet completed - proceeding"
+          fi
+
       - name: Set up Python
+        if: steps.check_setup.outputs.setup_complete != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Check if tokens exist
+        if: steps.check_setup.outputs.setup_complete != 'true'
         id: check_tokens
         run: |
           # Check if tokens exist in the repository (excluding .git directory and setup script itself)
@@ -155,9 +181,16 @@ jobs:
           
           # Stage and commit changes
           git add -A
-          git commit -m "Replace project tokens with repository name [skip setup]" || {
+          git commit -m "Replace project tokens with repository name" || {
             echo "No changes to commit or commit failed"
             exit 0
+          }
+          
+          # Create marker file to indicate setup is complete
+          echo "Setup completed on $(date)" > .setup-complete
+          git add .setup-complete
+          git commit -m "Mark setup as complete" || {
+            echo "Failed to commit marker file"
           }
           
           # Push ONLY to the current repository's main branch
