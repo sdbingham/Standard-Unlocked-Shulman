@@ -1,4 +1,4 @@
-# __PROJECT_LABEL__
+# Standard-Unlocked-Shulman
 
 This repository contains everything you need to realize enterprise-grade Salesforce CICD practices without making an enterprise-grade investment. 
 
@@ -35,8 +35,8 @@ We strongly advocate adhering to a "Release Train" development methodology for S
    
    The script will:
    - Read project values from `cumulusci.yml` (or derive from repository name)
-   - Permanently replace `__PROJECT_NAME__` and `__PROJECT_LABEL__` tokens in all filenames and file contents
-   - Rename directories (e.g., `robot/__PROJECT_LABEL__/` → `robot/Your-Project-Name/`)
+   - Permanently replace `StandardUnlockedShulman` and `Standard-Unlocked-Shulman` tokens in all filenames and file contents
+   - Rename directories (e.g., `robot/Standard-Unlocked-Shulman/` → `robot/Your-Project-Name/`)
    - Update all configuration files (`.gitignore`, `sfdx-project.json`, `orgs/*.json`, etc.)
    
    Then commit the changes:
@@ -48,7 +48,7 @@ We strongly advocate adhering to a "Release Train" development methodology for S
 5. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
 
 > [!NOTE]
-> 1. As you explore this project, you may notice a large number of tokens such as `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml). **Run `setup_new_project.py` once at project initialization** to permanently replace these tokens. After that, all files will use your actual project name.
+> 1. As you explore this project, you may notice a large number of tokens such as `Standard-Unlocked-Shulman` and `StandardUnlockedShulman`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml). **Run `setup_new_project.py` once at project initialization** to permanently replace these tokens. After that, all files will use your actual project name.
 
 ## Development
 
