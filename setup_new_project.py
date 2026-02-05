@@ -60,8 +60,17 @@ def get_project_values_from_cumulusci():
     return project_name, package_name, name_managed
 
 
-def replace_tokens_in_files(package_name: str, name_managed: str):
-    """Replace __PROJECT_NAME__ and __PROJECT_LABEL__ tokens in filenames and file contents."""
+def replace_tokens_in_files(package_name: str, name_managed: str, project_name: str = None):
+    """
+    Replace __PROJECT_NAME__ and __PROJECT_LABEL__ tokens in filenames and file contents.
+    
+    Args:
+        package_name: Package name (e.g., "StandardUnlockedShulman")
+        name_managed: Name managed (e.g., "Standard Unlocked Shulman")
+        project_name: Project name (e.g., "Standard Unlocked Shulman"). If None, uses name_managed.
+    """
+    if project_name is None:
+        project_name = name_managed
     renamed_count = 0
     updated_count = 0
     
@@ -82,7 +91,7 @@ def replace_tokens_in_files(package_name: str, name_managed: str):
         except Exception as e:
             print(f"[WARNING] Could not rename robot/__PROJECT_LABEL__ directory: {e}")
     
-    # First, update cumulusci.yml to replace tokens in config
+    # First, update cumulusci.yml to replace tokens and update project values
     cumulusci_yml = Path("cumulusci.yml")
     if cumulusci_yml.exists():
         try:
@@ -96,9 +105,33 @@ def replace_tokens_in_files(package_name: str, name_managed: str):
             content = content.replace('__PROJECT_NAME__', package_name)
             content = content.replace('__PROJECT_LABEL__', name_managed_hyphenated)
             
+            # Also update the actual project.name, package.name, and name_managed fields
+            # This ensures cumulusci.yml reflects the repository name when using a template
+            # Update project.name (format: "project:\n    name: value")
+            content = re.sub(
+                r'(project:\s*\n\s+name:\s+)(["\']?)([^\n"\']+)(["\']?)',
+                rf'\1\2{project_name}\4',
+                content,
+                flags=re.MULTILINE
+            )
+            # Update package.name (format: "package:\n        name: value" - note 8 spaces for name)
+            content = re.sub(
+                r'(package:\s*\n\s+name:\s+)(\w+)',
+                rf'\1{package_name}',
+                content,
+                flags=re.MULTILINE
+            )
+            # Update name_managed (format: "        name_managed: value" - 8 spaces)
+            content = re.sub(
+                r'(\s+name_managed:\s+)(["\']?)([^\n"\']+)(["\']?)',
+                rf'\1\2{name_managed}\4',
+                content,
+                flags=re.MULTILINE
+            )
+            
             if content != original_content:
                 cumulusci_yml.write_text(content, encoding='utf-8')
-                print(f"[OK] Updated cumulusci.yml")
+                print(f"[OK] Updated cumulusci.yml with project values")
                 updated_count += 1
         except Exception as e:
             print(f"[WARNING] Could not update cumulusci.yml: {e}")
@@ -364,7 +397,7 @@ def main():
     package_name = None
     name_managed = None
     
-    # Priority 1: Command-line arguments (explicit values)
+    # Priority 1: Command-line arguments (explicit values) - highest priority
     if args.project_name and args.package_name and args.name_managed:
         project_name = args.project_name
         package_name = args.package_name
@@ -373,14 +406,19 @@ def main():
         print(f"  Project Name: {project_name}")
         print(f"  Package Name: {package_name}")
         print(f"  Name Managed: {name_managed}")
-    # Priority 2: Repository name (derive values)
+    # Priority 2: Repository name (derive values) - use this when repo name is provided
+    # This takes precedence over cumulusci.yml because when using a template,
+    # the repository name is the source of truth, not the template's cumulusci.yml
     elif repo_name:
         project_name, package_name, name_managed = derive_project_values(repo_name)
         print(f"Derived values from repository name '{repo_name}':")
         print(f"  Project Name: {project_name}")
         print(f"  Package Name: {package_name}")
         print(f"  Name Managed: {name_managed}")
-    # Priority 3: Try to read from cumulusci.yml
+        print()
+        print("Note: Using repository name instead of cumulusci.yml values.")
+        print("The script will update cumulusci.yml with these values.")
+    # Priority 3: Try to read from cumulusci.yml (fallback when no repo name provided)
     else:
         project_name, package_name, name_managed = get_project_values_from_cumulusci()
         if project_name and package_name and name_managed:
@@ -428,7 +466,7 @@ def main():
     print("Replacing Tokens")
     print("=" * 60)
     print()
-    renamed_count, updated_count = replace_tokens_in_files(package_name, name_managed)
+    renamed_count, updated_count = replace_tokens_in_files(package_name, name_managed, project_name)
     
     if renamed_count > 0 or updated_count > 0:
         print()
