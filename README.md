@@ -45,7 +45,40 @@ We strongly advocate adhering to a "Release Train" development methodology for S
    git commit -m "Replace project tokens with actual project name"
    git push
    ```
-5. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
+5. **Configure Salesforce Authentication**:
+   
+   **Option A: Automated Setup via GitHub Actions (Recommended)**:
+   - **Test first (optional)**: Run `python test_auth_logic.py` locally to verify your credentials work
+   - Go to **Actions** → **Setup Salesforce Authentication** → **Run workflow**
+   - Provide:
+     - **Org URL**: Enter your Salesforce org URL manually (e.g., `https://login.salesforce.com`, `https://test.salesforce.com`, or custom domain)
+     - **Username**: Your Salesforce username
+     - **Password**: Your Salesforce password (⚠️ Note: Password will be visible in workflow logs - consider using a test/dev org)
+     - **Security Token**: (Optional - only if IP is not whitelisted)
+     - **Secret Name**: `DEV_HUB_AUTH_URL` (default)
+   - Click **Run workflow**
+   - The workflow will automatically:
+     - Authenticate to Salesforce
+     - Generate SFDX auth URL
+     - Create GitHub secret
+   - **That's it!** No certificates, no Connected Apps, no manual steps.
+   
+   > ⚠️ **Security Note**: GitHub Actions workflow inputs are visible in workflow logs. For production orgs, consider using the local script (`setup_salesforce_auth.py`) or manually creating the secret.
+   
+   **Option B: Using Local Script**:
+   - Install required Python packages: `pip install requests pynacl`
+   - Run the authentication setup script:
+     ```bash
+     python setup_salesforce_auth.py
+     ```
+   - The script will:
+     - Prompt for Salesforce org alias
+     - Open browser for Salesforce authentication
+     - Retrieve SFDX auth URL
+     - Create `DEV_HUB_AUTH_URL` GitHub secret automatically
+   
+   **Option C: Manual Setup**:
+   - Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure secrets manually.
 
 > [!IMPORTANT]
 > **Template Protection**: This repository is protected by multiple safeguards to ensure it is NEVER modified when used as a template. See [TEMPLATE_PROTECTION.md](TEMPLATE_PROTECTION.md) for details.

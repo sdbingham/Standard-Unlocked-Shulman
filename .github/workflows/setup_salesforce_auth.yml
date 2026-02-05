@@ -1,0 +1,232 @@
+# This workflow automatically sets up Salesforce authentication.
+# It prompts for org URL and credentials, then handles everything else automatically.
+#
+# To use:
+# 1. Run this workflow manually
+# 2. Provide org URL and credentials
+# 3. The workflow will authenticate, generate SFDX auth URL, and create GitHub secret automatically
+
+name: Setup Salesforce Authentication
+
+on:
+  workflow_dispatch:
+    inputs:
+      org_url:
+        description: 'Salesforce Org URL (e.g., https://login.salesforce.com or https://test.salesforce.com or custom domain)'
+        required: true
+        type: string
+      username:
+        description: 'Salesforce Username'
+        required: true
+        type: string
+      password:
+        description: 'Salesforce Password (⚠️ Will be visible in logs - use a test/dev org)'
+        required: true
+        type: string
+      security_token:
+        description: 'Security Token (leave empty if IP whitelisted)'
+        required: false
+        type: string
+      secret_name:
+        description: 'GitHub Secret Name'
+        required: false
+        default: 'DEV_HUB_AUTH_URL'
+        type: choice
+        options:
+          - DEV_HUB_AUTH_URL
+          - BETA_ORG_AUTH_URL
+          - PROD_ORG_AUTH_URL
+
+jobs:
+  setup-auth:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      secrets: write
+    
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests pynacl
+
+      - name: Authenticate and Generate SFDX Auth URL
+        id: auth
+        env:
+          SF_USERNAME: ${{ github.event.inputs.username }}
+          SF_PASSWORD: ${{ github.event.inputs.password }}
+          SF_SECURITY_TOKEN: ${{ github.event.inputs.security_token }}
+          SF_SERVERURL: ${{ github.event.inputs.org_url }}
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import requests
+          import json
+          import os
+          
+          username = os.getenv('SF_USERNAME')
+          password = os.getenv('SF_PASSWORD')
+          security_token = os.getenv('SF_SECURITY_TOKEN', '')
+          server_url = os.getenv('SF_SERVERURL')
+          
+          # Validate and normalize org URL
+          server_url = server_url.strip()
+          if not server_url.startswith('http'):
+              server_url = 'https://' + server_url
+          
+          # Combine password and security token
+          full_password = password + security_token if security_token else password
+          
+          print("Authenticating to Salesforce...")
+          print(f"Username: {username}")
+          print(f"Org URL: {server_url}")
+          # Note: Password is not printed for security
+          
+          # Authenticate using Username-Password OAuth Flow
+          token_url = f"{server_url}/services/oauth2/token"
+          
+          payload = {
+              'grant_type': 'password',
+              'client_id': 'PlatformCLI',  # Standard Salesforce CLI client ID
+              'client_secret': '',  # Not needed for PlatformCLI
+              'username': username,
+              'password': full_password
+          }
+          
+          try:
+              response = requests.post(token_url, data=payload)
+              response.raise_for_status()
+              
+              token_data = response.json()
+              access_token = token_data.get('access_token')
+              instance_url = token_data.get('instance_url')
+              refresh_token = token_data.get('refresh_token')
+              
+              if not access_token or not instance_url:
+                  print("❌ Error: Missing required tokens from authentication response")
+                  print(f"Response: {token_data}")
+                  exit(1)
+              
+              if not refresh_token:
+                  print("❌ Error: No refresh token received")
+                  print("   Refresh tokens are required for persistent authentication")
+                  print("   Please ensure your org allows refresh tokens")
+                  exit(1)
+              
+              # Construct SFDX auth URL
+              # Format: force://clientId:clientSecret:refreshToken@instanceUrl
+              # For PlatformCLI, clientId and clientSecret are empty
+              auth_url = f"force://PlatformCLI:::{refresh_token}@{instance_url}"
+              
+              # Save auth URL to file
+              with open('auth_url.txt', 'w') as f:
+                  f.write(auth_url)
+              
+              print("✅ Authentication successful")
+              print("✅ SFDX Auth URL generated")
+              
+          except requests.exceptions.RequestException as e:
+              print(f"❌ Authentication failed: {e}")
+              if hasattr(e, 'response') and e.response is not None:
+                  try:
+                      error_data = e.response.json()
+                      print(f"   Error: {error_data.get('error_description', e.response.text)}")
+                  except:
+                      print(f"   Response: {e.response.text}")
+              print("\nPlease verify:")
+              print("  - Username and password are correct")
+              print("  - Security token is provided if IP is not whitelisted")
+              print("  - Dev Hub is enabled on the org")
+              exit(1)
+          PYTHON_SCRIPT
+          
+          if [ -f auth_url.txt ]; then
+            echo "auth_success=true" >> $GITHUB_OUTPUT
+            echo "auth_url_available=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Failed to generate auth URL"
+            exit 1
+          fi
+
+      - name: Create GitHub Secret
+        if: steps.auth.outputs.auth_url_available == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import os
+          import requests
+          from nacl import encoding, public
+          
+          github_token = os.getenv('GITHUB_TOKEN')
+          secret_name = '${{ github.event.inputs.secret_name }}'
+          owner = '${{ github.repository_owner }}'
+          repo = '${{ github.event.repository.name }}'
+          
+          # Read auth URL from file
+          with open('auth_url.txt', 'r') as f:
+              auth_url = f.read().strip()
+          
+          # Get public key
+          public_key_url = f'https://api.github.com/repos/{owner}/{repo}/actions/secrets/public-key'
+          headers = {
+              'Authorization': f'token {github_token}',
+              'Accept': 'application/vnd.github.v3+json'
+          }
+          
+          response = requests.get(public_key_url, headers=headers)
+          response.raise_for_status()
+          public_key_data = response.json()
+          public_key = public_key_data['key']
+          key_id = public_key_data['key_id']
+          
+          # Encrypt secret
+          public_key_obj = public.PublicKey(public_key.encode('utf-8'), encoding.Base64Encoder())
+          sealed_box = public.SealedBox(public_key_obj)
+          encrypted = sealed_box.encrypt(auth_url.encode('utf-8'))
+          encrypted_value = encoding.Base64Encoder().encode(encrypted).decode('utf-8')
+          
+          # Create secret
+          secret_url = f'https://api.github.com/repos/{owner}/{repo}/actions/secrets/{secret_name}'
+          payload = {
+              'encrypted_value': encrypted_value,
+              'key_id': key_id
+          }
+          
+          response = requests.put(secret_url, headers=headers, json=payload)
+          response.raise_for_status()
+          
+          print(f'✅ Successfully created GitHub secret: {secret_name}')
+          PYTHON_SCRIPT
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f auth_url.txt
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Setup Salesforce Authentication" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.auth.outputs.auth_url_available }}" == "true" ]; then
+            echo "✅ **Successfully authenticated and created GitHub secret: ${{ github.event.inputs.secret_name }}**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The secret is now available for use in your workflows." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Next steps:**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Verify the secret in: Settings > Secrets and variables > Actions" >> $GITHUB_STEP_SUMMARY
+            echo "2. Your workflows can now use this secret" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Failed to create secret**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the error messages above and try again." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Common issues:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Verify username and password are correct" >> $GITHUB_STEP_SUMMARY
+            echo "- If IP is not whitelisted, provide Security Token" >> $GITHUB_STEP_SUMMARY
+            echo "- Check that Dev Hub is enabled on the org" >> $GITHUB_STEP_SUMMARY
+            echo "- Ensure your org allows refresh tokens" >> $GITHUB_STEP_SUMMARY
+          fi
