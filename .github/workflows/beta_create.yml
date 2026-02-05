@@ -16,6 +16,11 @@ on:
       - "datasets/**"
 jobs:
   upload-beta:
+    # Skip if commit message contains [skip setup]
+    # This prevents running during initial project setup when tokens are replaced
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      !contains(github.event.head_commit.message, '[skip setup]')
     uses: nimba-actions/standard-workflows/.github/workflows/beta-unlocked.yml@main
     secrets:
       cci-token: ${{ secrets.CUMULUSCI_TOKEN }}
