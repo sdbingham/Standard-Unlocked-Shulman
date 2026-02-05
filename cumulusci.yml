@@ -33,13 +33,13 @@ tasks:
         options:
             required_org_code_coverage_percent: 75
 
-    # CumulusCI ships with both `retrieve_changes`, `permsets` and `deploy` tasks out of the box, '
-    # but they don't provide sufficient find/replace functionality so this project
-    # ships with custom wrapper tasks:
+    # CumulusCI ships with both `retrieve_changes`, `permsets`, `deploy`, and `create_package_version` tasks out of the box.
+    # This project ships with custom wrapper tasks:
     # └── 📁 tasks/
     #     ├── 📄 retrieve_changes.py
     #     ├── 📄 permsets.py
-    #     └── 📄 deploy.py
+    #     ├── 📄 deploy.py
+    #     └── 📄 create_package_version.py
     retrieve_changes:
         class_path: tasks.retrieve_changes.RetrieveChanges
         options:
@@ -47,6 +47,18 @@ tasks:
     deploy:
         class_path: tasks.deploy.Deploy
         options:
+            transforms:
+                - transform: find_replace
+                  options:
+                      patterns:
+                          - find: "__PROJECT_NAME__"
+                            replace: $project_config.project__package__name
+                          - find: "__PROJECT_LABEL__"
+                            replace: $project_config.project__package__name_managed
+    create_package_version:
+        class_path: tasks.create_package_version.CreatePackageVersion
+        options:
+            package_type: Unlocked
             transforms:
                 - transform: find_replace
                   options:
