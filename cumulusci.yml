@@ -59,14 +59,9 @@ tasks:
         class_path: tasks.permsets.AssignPermissionSetGroupsWithFindReplace
         options:
             api_names: __PROJECT_NAME__Admin
-            # Note: Transforms will be removed after setup_new_project.py runs
-            # The api_names token will be permanently replaced
-            transforms:
-                - transform: find_replace
-                  options:
-                      patterns:
-                          - find: "__PROJECT_NAME__"
-                            replace: $project_config.project__package__name
+            # Note: setup_new_project.py will permanently replace __PROJECT_NAME__ 
+            # with the package name (e.g., StandardUnlockedShulman)
+            # Transforms are not needed since tokens are replaced permanently
 
 flows:
     config_dev:
