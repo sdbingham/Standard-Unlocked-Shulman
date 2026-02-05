@@ -18,11 +18,12 @@ We strongly advocate adhering to a "Release Train" development methodology for S
 3. Modify the `name` and `name_managed` fields in [cumulusci.yml](cumulusci.yml)<sup>1</sup>
 4. **Option A: Automatic Setup (Recommended)** - Use the GitHub Action workflow:
    - Navigate to **Actions** → **Setup Project** → **Run workflow**
+   - Click **Run workflow** button
+   - Optionally provide a repository name (if left empty, it uses the current repository name)
    - The workflow will automatically:
      - Extract the repository name
      - Run the setup script to replace all tokens
      - Commit the changes back to the repository
-   - Alternatively, push your first commit to `main` branch and the workflow will run automatically if tokens are detected
    
    **Option B: Manual Setup** - Run the setup script locally:
    ```bash

@@ -53,4 +53,6 @@ $RECYCLE.BIN/
 .settings
 
 # Planning
-docs/
+# Ignore contents of docs folder but keep the folder itself
+docs/*
+!docs/.gitkeep
