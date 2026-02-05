@@ -1,0 +1,113 @@
+# This workflow automatically runs setup_new_project.py when the repository is first set up.
+# It extracts the repository name and replaces all __PROJECT_NAME__ and __PROJECT_LABEL__ tokens.
+# It runs automatically on push to main branch (happens automatically when repository is created from template).
+# Manual trigger via workflow_dispatch is available as a fallback.
+
+name: Setup Project
+
+on:
+  # Trigger automatically on push to main (happens when repository is created from template)
+  push:
+    branches:
+      - main
+  # Allow manual trigger as fallback
+  workflow_dispatch:
+    inputs:
+      repo_name:
+        description: 'Repository name (e.g., "Standard-Unlocked-Shulman"). If empty, uses current repository name.'
+        required: false
+        type: string
+
+jobs:
+  setup-project:
+    runs-on: ubuntu-latest
+    # Skip if commit message contains [skip setup] to prevent infinite loops
+    # Note: github.event.head_commit.message may be null for workflow_dispatch, so we check event type first
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == '' || !contains(github.event.head_commit.message, '[skip setup]')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check if tokens exist
+        id: check_tokens
+        run: |
+          # Check if tokens exist in the repository (excluding .git directory and setup script itself)
+          if grep -r "__PROJECT_NAME__\|__PROJECT_LABEL__" \
+            --include="*.yml" --include="*.yaml" --include="*.json" \
+            --include="*.xml" --include="*.cls" --include="*.py" \
+            --include=".gitignore" --include="*.md" \
+            --exclude-dir=".git" \
+            . 2>/dev/null | grep -v "setup_new_project.py" | head -1; then
+            echo "tokens_exist=true" >> $GITHUB_OUTPUT
+            echo "✅ Tokens found - setup will run"
+          else
+            echo "tokens_exist=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No tokens found - setup already complete or not needed"
+          fi
+
+      - name: Extract repository name
+        id: repo_name
+        run: |
+          if [ -n "${{ github.event.inputs.repo_name }}" ]; then
+            REPO_NAME="${{ github.event.inputs.repo_name }}"
+          else
+            # Extract repository name from GITHUB_REPOSITORY (format: owner/repo-name)
+            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          fi
+          echo "name=$REPO_NAME" >> $GITHUB_OUTPUT
+          echo "Repository name: $REPO_NAME"
+
+      - name: Run setup script
+        if: steps.check_tokens.outputs.tokens_exist == 'true'
+        env:
+          GITHUB_REPOSITORY_NAME: ${{ steps.repo_name.outputs.name }}
+          CI: 'true'
+        run: |
+          python setup_new_project.py --repo-name "${{ steps.repo_name.outputs.name }}" --non-interactive
+
+      - name: Check for changes
+        if: steps.check_tokens.outputs.tokens_exist == 'true'
+        id: verify_changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes_exist=true" >> $GITHUB_OUTPUT
+            echo "Changes detected:"
+            git status --short
+          else
+            echo "changes_exist=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          fi
+
+      - name: Commit changes
+        if: steps.check_tokens.outputs.tokens_exist == 'true' && steps.verify_changes.outputs.changes_exist == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git commit -m "chore: Replace project tokens with repository name [skip setup]"
+          git push
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.check_tokens.outputs.tokens_exist }}" == "false" ]; then
+            echo "## ✅ Setup Complete" >> $GITHUB_STEP_SUMMARY
+            echo "No tokens found. Project setup may have already been completed." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.verify_changes.outputs.changes_exist }}" == "true" ]; then
+            echo "## ✅ Setup Complete" >> $GITHUB_STEP_SUMMARY
+            echo "Successfully replaced all project tokens and committed changes." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ No Changes" >> $GITHUB_STEP_SUMMARY
+            echo "Tokens were found but no changes were made. Please check the script output." >> $GITHUB_STEP_SUMMARY
+          fi
+
+permissions:
+  contents: write

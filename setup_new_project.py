@@ -11,6 +11,8 @@ This script permanently replaces __PROJECT_NAME__ and __PROJECT_LABEL__ tokens i
 Run this script once at the beginning of a new project setup.
 """
 
+import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -294,8 +296,61 @@ def check_for_tokens():
     return tokens_found
 
 
+def derive_project_values(repo_name: str):
+    """
+    Derive project values from repository name.
+    
+    Examples:
+    - "Standard-Unlocked-Shulman" -> project_name: "Standard Unlocked Shulman", package_name: "StandardUnlockedShulman", name_managed: "Standard Unlocked Shulman"
+    - "My-Awesome-Project" -> project_name: "My Awesome Project", package_name: "MyAwesomeProject", name_managed: "My Awesome Project"
+    """
+    # Convert hyphenated repo name to project name (hyphens -> spaces)
+    project_name = repo_name.replace("-", " ").replace("_", " ")
+    # Package name: remove spaces and hyphens
+    package_name = repo_name.replace("-", "").replace("_", "").replace(" ", "")
+    # Name managed: use project name as-is (spaces preserved)
+    name_managed = project_name
+    
+    return project_name, package_name, name_managed
+
+
 def main():
     """Main setup function."""
+    parser = argparse.ArgumentParser(
+        description="Replace __PROJECT_NAME__ and __PROJECT_LABEL__ tokens in filenames and file contents."
+    )
+    parser.add_argument(
+        '--repo-name',
+        type=str,
+        help='Repository name (e.g., "Standard-Unlocked-Shulman"). If not provided, will try to read from cumulusci.yml or prompt.'
+    )
+    parser.add_argument(
+        '--non-interactive',
+        action='store_true',
+        help='Run in non-interactive mode (skip prompts, use defaults)'
+    )
+    parser.add_argument(
+        '--project-name',
+        type=str,
+        help='Project name (e.g., "Standard Unlocked Shulman"). Overrides repo-name derivation.'
+    )
+    parser.add_argument(
+        '--package-name',
+        type=str,
+        help='Package name (e.g., "StandardUnlockedShulman"). Overrides repo-name derivation.'
+    )
+    parser.add_argument(
+        '--name-managed',
+        type=str,
+        help='Name managed (e.g., "Standard Unlocked Shulman"). Overrides repo-name derivation.'
+    )
+    
+    args = parser.parse_args()
+    
+    # Check for environment variables (for GitHub Actions)
+    repo_name = args.repo_name or os.getenv('GITHUB_REPOSITORY_NAME') or os.getenv('REPO_NAME')
+    non_interactive = args.non_interactive or os.getenv('CI') == 'true'
+    
     print("=" * 60)
     print("Project Token Replacement Script")
     print("=" * 60)
@@ -304,20 +359,43 @@ def main():
     print("tokens in filenames and file contents.")
     print()
     
-    # Try to read values from cumulusci.yml
-    project_name, package_name, name_managed = get_project_values_from_cumulusci()
+    # Determine project values
+    project_name = None
+    package_name = None
+    name_managed = None
     
-    if project_name and package_name and name_managed:
-        print("Found values in cumulusci.yml:")
+    # Priority 1: Command-line arguments (explicit values)
+    if args.project_name and args.package_name and args.name_managed:
+        project_name = args.project_name
+        package_name = args.package_name
+        name_managed = args.name_managed
+        print("Using explicit values from command-line arguments:")
         print(f"  Project Name: {project_name}")
         print(f"  Package Name: {package_name}")
         print(f"  Name Managed: {name_managed}")
-        print()
-        confirm = input("Use these values to replace tokens? (y/n): ").strip().lower()
-        if confirm != 'y':
-            print("Cancelled.")
-            sys.exit(0)
+    # Priority 2: Repository name (derive values)
+    elif repo_name:
+        project_name, package_name, name_managed = derive_project_values(repo_name)
+        print(f"Derived values from repository name '{repo_name}':")
+        print(f"  Project Name: {project_name}")
+        print(f"  Package Name: {package_name}")
+        print(f"  Name Managed: {name_managed}")
+    # Priority 3: Try to read from cumulusci.yml
     else:
+        project_name, package_name, name_managed = get_project_values_from_cumulusci()
+        if project_name and package_name and name_managed:
+            print("Found values in cumulusci.yml:")
+            print(f"  Project Name: {project_name}")
+            print(f"  Package Name: {package_name}")
+            print(f"  Name Managed: {name_managed}")
+    
+    # If we still don't have values, prompt (unless non-interactive)
+    if not (project_name and package_name and name_managed):
+        if non_interactive:
+            print("Error: Could not determine project values and running in non-interactive mode.")
+            print("Please provide --repo-name or ensure cumulusci.yml has the required values.")
+            sys.exit(1)
+        
         # Prompt for values
         print("Could not read values from cumulusci.yml.")
         print("Please provide the following values:")
@@ -335,8 +413,11 @@ def main():
         print("Derived values:")
         print(f"  Package Name: {package_name} (spaces removed)")
         print(f"  Name Managed: {name_managed} (spaces -> hyphens)")
+    
+    # Confirm (unless non-interactive)
+    if not non_interactive:
         print()
-        confirm = input("Continue with these values? (y/n): ").strip().lower()
+        confirm = input("Use these values to replace tokens? (y/n): ").strip().lower()
         if confirm != 'y':
             print("Cancelled.")
             sys.exit(0)
