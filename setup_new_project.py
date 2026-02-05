@@ -35,13 +35,25 @@ def get_project_values_from_cumulusci():
         content = file_path.read_text(encoding='latin-1')
     
     # Extract values using regex
-    project_name_match = re.search(r'project:\s*\n\s*name:\s*"([^"]+)"', content)
+    # Handle both quoted and unquoted values
+    project_name_match = re.search(r'project:\s*\n\s*name:\s*(?:"([^"]+)"|([^\n]+))', content)
     package_name_match = re.search(r'package:\s*\n\s*name:\s*(\w+)', content)
-    name_managed_match = re.search(r'name_managed:\s*"([^"]+)"', content)
+    name_managed_match = re.search(r'name_managed:\s*(?:"([^"]+)"|([^\n]+))', content)
     
-    project_name = project_name_match.group(1) if project_name_match else None
+    # Extract matched groups (handle both quoted and unquoted)
+    project_name = None
+    if project_name_match:
+        project_name = project_name_match.group(1) or project_name_match.group(2)
+        if project_name:
+            project_name = project_name.strip()
+    
+    name_managed = None
+    if name_managed_match:
+        name_managed = name_managed_match.group(1) or name_managed_match.group(2)
+        if name_managed:
+            name_managed = name_managed.strip()
+    
     package_name = package_name_match.group(1) if package_name_match else None
-    name_managed = name_managed_match.group(1) if name_managed_match else None
     
     return project_name, package_name, name_managed
 
@@ -164,8 +176,25 @@ def replace_tokens_in_files(package_name: str, name_managed: str):
             continue
         
         # Skip certain file types and directories
-        skip_patterns = ['.git', '__pycache__', '.pyc', 'node_modules', 'cumulusci.yml']
-        if any(pattern in str(file_path) for pattern in skip_patterns):
+        # Note: Check for .git/ directory, not .gitignore file
+        skip_patterns = ['__pycache__', '.pyc', 'node_modules']
+        file_path_str = str(file_path)
+        # Skip .git directory but not .gitignore file
+        # Check if any parent directory is named .git
+        skip_file = False
+        try:
+            for parent in file_path.parents:
+                if parent.name == '.git':
+                    skip_file = True
+                    break
+        except (AttributeError, ValueError):
+            pass
+        if skip_file:
+            continue
+        # Skip cumulusci.yml (handled separately)
+        if file_path.name == 'cumulusci.yml':
+            continue
+        if any(pattern in file_path_str for pattern in skip_patterns):
             continue
         
         try:
@@ -184,11 +213,20 @@ def replace_tokens_in_files(package_name: str, name_managed: str):
                 rel_path = file_path.relative_to(Path.cwd())
                 print(f"[OK] Updated {rel_path}")
                 updated_count += 1
-        except (UnicodeDecodeError, PermissionError):
+            elif file_path.name == '.gitignore':
+                # Debug: Check if .gitignore has tokens but wasn't updated
+                if '__PROJECT_NAME__' in original_content or '__PROJECT_LABEL__' in original_content:
+                    print(f"[DEBUG] .gitignore has tokens but content didn't change. Original: {original_content[:100]}")
+        except (UnicodeDecodeError, PermissionError) as e:
             # Skip binary files or files that can't be read/written
+            if file_path.name == '.gitignore':
+                print(f"[DEBUG] .gitignore exception: {type(e).__name__}: {e}")
             pass
         except Exception as e:
             print(f"[WARNING] Could not update {file_path}: {e}")
+            if file_path.name == '.gitignore':
+                import traceback
+                print(f"[DEBUG] .gitignore traceback: {traceback.format_exc()}")
     
     return renamed_count, updated_count
 
