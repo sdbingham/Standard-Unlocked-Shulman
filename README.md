@@ -13,10 +13,8 @@ We strongly advocate adhering to a "Release Train" development methodology for S
 
 ## Getting Started
 
-1. Fork this repository.
-2. Make a _new_ Repository in your organization and select your fork as the `Repository Template`
-3. Modify the `name` and `name_managed` fields in [cumulusci.yml](cumulusci.yml)<sup>1</sup>
-4. **Option A: Automatic Setup (Recommended)** - Use the GitHub Action workflow:
+1. Create a _new_ Repository in your organization using this repository as the `Repository Template`
+2. **Option A: Automatic Setup (Recommended)** - Use the GitHub Action workflow:
    - Navigate to **Actions** → **Setup Project** → **Run workflow**
    - Click **Run workflow** button
    - Optionally provide a repository name (if left empty, it uses the current repository name)
@@ -27,11 +25,11 @@ We strongly advocate adhering to a "Release Train" development methodology for S
    
    **Option B: Manual Setup** - Run the setup script locally:
    ```bash
-   python setup_new_project.py
+   python scripts/setup_new_project.py
    ```
    Or with explicit repository name:
    ```bash
-   python setup_new_project.py --repo-name "Your-Project-Name" --non-interactive
+   python scripts/setup_new_project.py --repo-name "Your-Project-Name" --non-interactive
    ```
    
    The script will:
@@ -46,13 +44,13 @@ We strongly advocate adhering to a "Release Train" development methodology for S
    git commit -m "Replace project tokens with actual project name"
    git push
    ```
-5. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
+3. Follow the [`Initial Setup` instructions](https://github.com/Nimba-Solutions/Shulman-API/blob/main/.github/workflows/README.md#initial-setup) to configure the included CICD for this project.
 
 > [!IMPORTANT]
 > **Template Protection**: This repository is protected by multiple safeguards to ensure it is NEVER modified when used as a template. See [TEMPLATE_PROTECTION.md](TEMPLATE_PROTECTION.md) for details.
 
 > [!NOTE]
-> 1. As you explore this project, you may notice a large number of tokens such as `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml). **Run `setup_new_project.py` once at project initialization** to permanently replace these tokens. After that, all files will use your actual project name.
+> As you explore this project, you may notice a large number of tokens such as `__PROJECT_LABEL__` and `__PROJECT_NAME__`. These correspond to the `name_managed` and `name` attributes in [cumulusci.yml](cumulusci.yml). **Run `scripts/setup_new_project.py` once at project initialization** to permanently replace these tokens. After that, all files will use your actual project name.
 
 ## Development
 

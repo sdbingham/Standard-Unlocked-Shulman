@@ -456,7 +456,7 @@ def main():
                 print("The script should be run in a NEW repository created from this template.")
                 print()
                 print("If you want to run it here anyway, provide --repo-name:")
-                print("  python setup_new_project.py --repo-name 'Your-New-Project-Name'")
+                print("  python scripts/setup_new_project.py --repo-name 'Your-New-Project-Name'")
                 print()
                 confirm = input("Continue anyway? (y/n): ").strip().lower()
                 if confirm != 'y':
