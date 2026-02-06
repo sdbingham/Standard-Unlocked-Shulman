@@ -1,4 +1,4 @@
-# This workflow runs scripts/setup_new_project.py when the repository is first set up.
+# This workflow runs setup_new_project.py when the repository is first set up.
 # It extracts the repository name and replaces all __PROJECT_NAME__ and __PROJECT_LABEL__ tokens.
 # Run this workflow manually after creating a repository from the template.
 
@@ -63,7 +63,7 @@ jobs:
             --include="*.xml" --include="*.cls" --include="*.py" \
             --include=".gitignore" --include="*.md" \
             --exclude-dir=".git" \
-            . 2>/dev/null | grep -v "scripts/setup_new_project.py" | head -1; then
+            . 2>/dev/null | grep -v "setup_new_project.py" | head -1; then
             echo "tokens_exist=true" >> $GITHUB_OUTPUT
             echo "✅ Tokens found - setup will run"
             echo "Note: This workflow replaces tokens in the NEW repository, not the template repository."
@@ -105,7 +105,7 @@ jobs:
           echo "Repository name: ${{ steps.repo_name.outputs.name }}"
           echo "Environment variable GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
           echo ""
-          python scripts/setup_new_project.py --repo-name "${{ steps.repo_name.outputs.name }}" --non-interactive
+          python setup_new_project.py --repo-name "${{ steps.repo_name.outputs.name }}" --non-interactive
           echo ""
           echo "Setup script completed. Checking results..."
           echo "Project name in cumulusci.yml:"

@@ -22,7 +22,7 @@ jobs:
       cci-token: ${{ secrets.CUMULUSCI_TOKEN }}
       prod-org-auth-url: ${{ inputs.environment == 'production' && secrets.PROD_ORG_AUTH_URL || secrets.BETA_ORG_AUTH_URL }}
     with:
-      cumulusci-version: "3.78.0"
+      cumulusci-version: "3.93.0"
 
 permissions:
   actions: write

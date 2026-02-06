@@ -19,10 +19,10 @@ jobs:
       cci-token: ${{ secrets.CUMULUSCI_TOKEN }}
       dev-hub-auth-url: ${{ secrets.DEV_HUB_AUTH_URL }}
     with:
-      cumulusci-version: "3.90.0"
+      cumulusci-version: "3.93.0"
       sfdx-version: "7.209.6"
 
-  apex-scan:
+  apex-and-metadata-scanner:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -39,28 +39,15 @@ jobs:
           npm install @salesforce/cli -g
           sf plugins install @salesforce/sfdx-scanner@latest
 
-      - name: Run SFDX Scanner - Report findings as comments
-        uses: mitchspano/sfdx-scan-pull-request@v0.1.16
-        with:
-          pmdconfig: pmd-rules.xml
-          severity-threshold: 4
-          strictly-enforced-rules: '[{ "engine": "pmd", "category": "Performance", "rule": "AvoidDebugStatements" }]'
-          report-mode: comments
-          delete-resolved-comments: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-permissions:
-  actions: write
-  attestations: write
-  checks: write
-  contents: write
-  deployments: write
-  discussions: write
-  issues: write
-  packages: write
-  pages: write
-  pull-requests: write
-  repository-projects: write
-  security-events: write
-  statuses: write
+      ##############################################################
+      #          Mute this until we agree on the ruleset
+      ##############################################################
+      # - name: Run SFDX Scanner - Report findings as comments
+      #   uses: nimba-actions/sfdx-scan-pull-request@main
+      #   with:
+      #     pmdconfig: pmd-rules.xml
+      #     severity-threshold: 3
+      #     report-mode: comments
+      #     delete-resolved-comments: true
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

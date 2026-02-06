@@ -21,7 +21,7 @@ jobs:
       cci-token: ${{ secrets.CUMULUSCI_TOKEN }}
       dev-hub-auth-url: ${{ secrets.DEV_HUB_AUTH_URL }}
     with:
-      cumulusci-version: "3.78.0"
+      cumulusci-version: "3.93.0"
       sfdx-version: "7.209.6"
       org-name: "dev"
       debug: true
@@ -32,7 +32,7 @@ jobs:
       cci-token: ${{ secrets.CUMULUSCI_TOKEN }}
       dev-hub-auth-url: ${{ secrets.DEV_HUB_AUTH_URL }}
     with:
-      cumulusci-version: "3.90.1"
+      cumulusci-version: "3.93.0"
       sfdx-version: "7.209.6"
       debug: true
 
